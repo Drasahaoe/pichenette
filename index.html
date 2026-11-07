@@ -141,7 +141,7 @@
     <div class="sub">Duel de pichenettes tour par tour — classé, ami ou contre l'IA. <b>v8</b> <span style="opacity:.65">(si vous ne voyez pas « v8 » ici, faites Ctrl+F5 pour mettre à jour !)</span></div>
     <button class="btn primary" id="btnLocal">👥 2 joueurs — même écran</button>
     <button class="btn" id="btnAI">🤖 Jouer contre l'IA</button>
-    <button class="btn" id="btnRanked">🏆 Partie classée — queue & Elo</button>
+    <button class="btn" id="btnRanked">🏆 Queue classée</button>
     <button class="btn" id="btnLadder">📊 Classement mondial</button>
     <button class="btn" id="btnHost">🌐 Partie amicale — créer (code)</button>
     <button class="btn" id="btnJoin">🔑 Partie amicale — rejoindre (code)</button>
@@ -293,6 +293,7 @@
   <div class="card">
     <h2>📊 Classement mondial</h2>
     <div class="small" style="margin-bottom:6px">Elo mis à jour après chaque partie classée. Ta ligne est surlignée.</div>
+    <div class="small" style="margin-bottom:8px;font-weight:700" id="myEloLine">Ton Elo : 1000 (0V - 0D)</div>
     <table class="ladder">
       <thead><tr><th>#</th><th>Joueur</th><th>Elo</th><th>Bilan</th></tr></thead>
       <tbody id="ladderBody"><tr><td colspan="4">Chargement…</td></tr></tbody>
@@ -2516,6 +2517,8 @@ function stopQueue(endClient) {
 }
 function openLadder() {
   show("ladderPanel");
+  const mp = getProfile();
+  $("myEloLine").textContent = "Ton Elo : " + mp.elo + " (" + (mp.w || 0) + "V - " + (mp.l || 0) + "D)";
   if (!netAvailable()) { $("ladderBody").innerHTML = "<tr><td colspan='4'>Bibliothèque réseau non chargée.</td></tr>"; return; }
   if (ladderMq) { try { ladderMq.end(true); } catch (e) {} }
   const seen = {};
@@ -2760,6 +2763,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="USqJQ+ck8Q4A7HlkW9ghAA==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="1fkoiPA8vgTo+1ghzs9Qjg==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
