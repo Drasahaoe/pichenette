@@ -69,6 +69,28 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   #winText { font-size: 30px; font-weight: 800; text-align: center; margin-bottom: 18px; }
   #synfoPanel .card { max-width: 380px; }
+
+  /* --- Embellissements v2 --- */
+  .card { background: linear-gradient(160deg, #25344f, #1d2a40); }
+  .card h1 { background: linear-gradient(90deg, #ffd166, #ff8c5b); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .card h1 .accent { color: inherit; }
+  #topbar { background: rgba(16,24,38,.45); border-radius: 12px; margin-top: 6px; backdrop-filter: blur(4px); }
+  .pill.terrain { background: #22384f; border-color: #3f6b5a; }
+  .pill.elo { background: #3d3350; border-color: #7d64b0; }
+  .terrains { display: flex; gap: 8px; margin: 8px 0 16px; }
+  .tbtn { flex: 1; padding: 10px 6px; border-radius: 10px; background: #26354a; border: 2px solid #3b5170; color: #e8edf5; cursor: pointer; font-size: 14px; font-weight: 600; text-align: center; }
+  .tbtn span { display: block; font-size: 11px; font-weight: 400; opacity: .7; margin-top: 3px; }
+  .tbtn.sel { border-color: #ffd166; background: #2e445e; box-shadow: 0 0 12px rgba(255,209,102,.25); }
+  table.ladder { width: 100%; border-collapse: collapse; font-size: 15px; }
+  table.ladder th { text-align: left; color: #ffd166; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; padding: 6px 8px; }
+  table.ladder td { padding: 7px 8px; border-top: 1px solid #3b5170; }
+  table.ladder tr.me td { background: rgba(255,209,102,.12); font-weight: 700; }
+  #charPanel { position: fixed; top: 14px; right: 14px; z-index: 20; max-width: 300px; background: #22314a; border: 1px solid #4f7ab0; border-radius: 12px; padding: 12px 14px; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+  #charPanel img { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #ffd166; float: left; margin-right: 10px; }
+  #charPanel h3 { font-size: 16px; margin-bottom: 4px; color: #ffd166; }
+  #charPanel p { font-size: 12.5px; line-height: 1.45; opacity: .92; }
+  #charPanel .close { position: absolute; top: 6px; right: 8px; background: none; border: none; color: #8fa3c0; font-size: 16px; cursor: pointer; }
+  #ladderPanel .card { max-width: 480px; max-height: 80vh; overflow-y: auto; }
 </style>
 </head>
 <body>
@@ -76,6 +98,8 @@
   <div id="topbar">
     <span class="pill">🏟️ <span class="score" id="score">0 — 0</span></span>
     <span class="pill" id="turnPill">Tour : Rouge</span>
+    <span class="pill terrain" id="terrainPill">🌿 Pelouse</span>
+    <span class="pill elo hidden" id="eloPill"></span>
     <span id="status"></span>
   </div>
   <div id="gameholder"><canvas id="cv" width="1000" height="600"></canvas></div>
@@ -90,8 +114,16 @@
     <div class="sub">Duel de pichenettes tour par tour — 2 joueurs ou contre l'IA, 4 personnages à capacités.</div>
     <button class="btn primary" id="btnLocal">👥 2 joueurs — même écran</button>
     <button class="btn" id="btnAI">🤖 Jouer contre l'IA</button>
-    <button class="btn" id="btnHost">🌐 Créer une partie en ligne</button>
-    <button class="btn" id="btnJoin">🔑 Rejoindre une partie (code)</button>
+    <button class="btn" id="btnRanked">🏆 Partie classée — queue & Elo</button>
+    <button class="btn" id="btnLadder">📊 Classement mondial</button>
+    <button class="btn" id="btnHost">🌐 Partie amicale — créer (code)</button>
+    <button class="btn" id="btnJoin">🔑 Partie amicale — rejoindre (code)</button>
+    <div class="sub" style="margin-bottom:4px">🏟️ Terrain de jeu</div>
+    <div class="terrains">
+      <button class="tbtn" data-terrain="pelouse">🌿 Pelouse<span>glisse normale</span></button>
+      <button class="tbtn" data-terrain="glace">🧊 Glace<span>très glissant</span></button>
+      <button class="tbtn" data-terrain="terre">🟤 Terre battue<span>ça accroche</span></button>
+    </div>
     <div class="rules">
       <b>But du jeu :</b> propulse le ballon dans le but adverse. Tu ne touches <b>jamais</b> le ballon directement — uniquement tes jetons (fronde : maintiens, tire en arrière, relâche). Premier à <b>5 points</b>. Le but est <b>plus petit que le ballon</b> : vise juste !<br/><b>Pas de bords :</b> ce qui sort du terrain est sorti — le ballon est remis au centre, un jeton éliminé se ressuscite à ton tour (collé à ton but, au prix de ton coup).<br/>
       <b>Personnages</b> (chaque joueur a les 4 mêmes) :
@@ -153,6 +185,48 @@
   </div>
 </div>
 
+<!-- PSEUDO -->
+<div class="overlay hidden" id="pseudoPanel">
+  <div class="card" style="max-width:380px">
+    <h2>🏅 Ton pseudonyme</h2>
+    <div class="sub">Il apparaîtra au classement. (3 à 15 caractères)</div>
+    <input type="text" id="pseudoInput" maxlength="15" placeholder="PSEUDO" autocomplete="off"/>
+    <button class="btn primary" id="btnPseudoOk">✅ C'est parti</button>
+    <button class="btn danger" id="btnPseudoCancel">Annuler</button>
+  </div>
+</div>
+
+<!-- QUEUE -->
+<div class="overlay hidden" id="queuePanel">
+  <div class="card" style="max-width:380px">
+    <h2>🏆 Queue classée</h2>
+    <div class="sub"><span class="spinner"></span><span id="queueState">Recherche d'un adversaire…</span></div>
+    <div class="small">Tu seras apparié automatiquement avec un autre joueur en queue. Le vainqueur gagne de l'Elo !</div>
+    <button class="btn danger" id="btnCancelQueue" style="margin-top:12px">Annuler</button>
+  </div>
+</div>
+
+<!-- LADDER -->
+<div class="overlay hidden" id="ladderPanel">
+  <div class="card">
+    <h2>📊 Classement mondial</h2>
+    <div class="small" style="margin-bottom:6px">Elo mis à jour après chaque partie classée. Ta ligne est surlignée.</div>
+    <table class="ladder">
+      <thead><tr><th>#</th><th>Joueur</th><th>Elo</th><th>Bilan</th></tr></thead>
+      <tbody id="ladderBody"><tr><td colspan="4">Chargement…</td></tr></tbody>
+    </table>
+    <button class="btn danger" id="btnCloseLadder" style="margin-top:14px">Fermer</button>
+  </div>
+</div>
+
+<!-- CHAR PANEL (fiche personnage, haut droite) -->
+<div id="charPanel" class="hidden">
+  <button class="close" id="btnCloseChar">✕</button>
+  <img id="charPanelImg" alt=""/>
+  <h3 id="charPanelName"></h3>
+  <p id="charPanelDesc"></p>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.2/dist/mqtt.min.js"></script>
 <script>
 "use strict";
@@ -183,7 +257,13 @@ const W = 1000, H = 600;
 const TOKEN_R = 27, BALL_R = 15, GOAL_R = 12;
 const GOAL_L = { x: 55, y: H / 2 }, GOAL_RR = { x: W - 55, y: H / 2 };
 const MAX_DRAG = 150, POWER = 0.14;
-const FRICTION = 0.94;            // moins glissant (table IRL)
+const TERRAINS = {
+  pelouse: { name: "Pelouse", emoji: "🌿", f: 0.94, c1: "#37884c", c2: "#2e7d43", stripe: "rgba(255,255,255,0.035)", line: "rgba(255,255,255,0.45)", ball: "#f5f0e6", dot: "#333" },
+  glace:   { name: "Glace", emoji: "🧊", f: 0.975, c1: "#d4ebf7", c2: "#a9cfe8", stripe: "rgba(70,110,150,0.06)", line: "rgba(60,90,120,0.55)", ball: "#2b3242", dot: "#f5f0e6" },
+  terre:   { name: "Terre battue", emoji: "🟤", f: 0.90, c1: "#b3814e", c2: "#8f5f30", stripe: "rgba(255,240,220,0.05)", line: "rgba(255,250,240,0.5)", ball: "#ffffff", dot: "#7a3b12" }
+};
+let terrain = "pelouse";
+function friction() { return TERRAINS[terrain].f; }
 const WALL_REST = 0.72, BODY_REST = 0.92, STOP_V = 0.06;
 const WIN_SCORE = 5;
 const CHARS = ["drasah", "wun", "benp", "synfo"];
@@ -258,6 +338,13 @@ function updateBar(bonus) {
   else if (phase === "moving") pill.textContent = "Pièces en mouvement…";
   else pill.textContent = "Tour : " + name + (bonus ? " (rejoue !)" : "");
   pill.className = "pill " + (phase === "setup" ? "" : (turn === 1 ? "red" : "blue")) + (bonus ? " bonus" : "");
+  const tp = $("terrainPill");
+  const T = TERRAINS[terrain];
+  tp.textContent = T.emoji + " " + T.name;
+  const ep = $("eloPill");
+  const p = getProfile();
+  if (p.name) { ep.classList.remove("hidden"); ep.textContent = "🏅 " + p.name + " · " + p.elo; }
+  else ep.classList.add("hidden");
 }
 function canPlaySide(owner) {
   if (phase !== "aim") return false;
@@ -286,8 +373,8 @@ function stepPhysics() {
     for (const b of bodies) {
       if (b.out) { b.vx = 0; b.vy = 0; continue; }
       b.x += b.vx / SUB; b.y += b.vy / SUB;
-      b.vx *= Math.pow(FRICTION, 1 / SUB);
-      b.vy *= Math.pow(FRICTION, 1 / SUB);
+      b.vx *= Math.pow(friction(), 1 / SUB);
+      b.vy *= Math.pow(friction(), 1 / SUB);
       const v = Math.hypot(b.vx, b.vy);
       if (v < STOP_V) { b.vx = 0; b.vy = 0; } else anyMove = true;
     }
@@ -589,7 +676,15 @@ function pointerDown(e) {
 function pointerMove(e) {
   if (!drag) return;
   const p = canvasPos(e);
-  if (drag.kind === "setup") { drag.px = p.x; drag.py = p.y; e.preventDefault(); return; }
+  if (drag.kind === "setup") {
+    // clamp dans son camp : impossible de dépasser la ligne médiane
+    const b = bodies[drag.idx];
+    let x = p.x, y = p.y;
+    y = Math.max(b.r + 12, Math.min(H - b.r - 12, y));
+    if (b.owner === 1) x = Math.min(x, W / 2 - b.r - 3); else x = Math.max(x, W / 2 + b.r + 3);
+    x = Math.max(b.r + 12, Math.min(W - b.r - 12, x));
+    drag.px = x; drag.py = y; e.preventDefault(); return;
+  }
   if (drag.kind === "ballplace") {
     // orientation du ballon : contraint au cercle autour du jeton cible
     const t = bodies[passTarget];
@@ -611,6 +706,7 @@ function pointerUp(e) {
   const b = bodies[drag.idx];
   const kind = drag.kind;
   if (kind === "setup") {
+    if (Math.hypot(drag.px - b.x, drag.py - b.y) < 5 && b.char) { showCharPanel(b.char); drag = null; return; }
     if (validSpot(b, drag.px, drag.py, false)) { b.x = drag.px; b.y = drag.py; setStatus("Position ok — valide quand tu es prêt."); }
     else setStatus("❌ Position invalide (moitié adverse, chevauchement ou but) — non déplacé.");
     drag = null; return;
@@ -627,7 +723,7 @@ function pointerUp(e) {
   }
   const dx = b.x - drag.x, dy = b.y - drag.y;
   const d = Math.hypot(dx, dy);
-  if (d < 8) { drag = null; return; }
+  if (d < 8) { if (kind === "token" && b.char) showCharPanel(b.char); drag = null; return; }
   const vx = dx * POWER, vy = dy * POWER;
   const idx = drag.idx; drag = null;
   if (kind === "token") {
@@ -649,12 +745,21 @@ cv.addEventListener("lostpointercapture", pointerUp);
 // ---------- Rendu ----------
 function draw() {
   ctx.clearRect(0, 0, W, H);
+  const T = TERRAINS[terrain];
   const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#37884c"); g.addColorStop(1, "#2e7d43");
+  g.addColorStop(0, T.c1); g.addColorStop(1, T.c2);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "rgba(255,255,255,0.035)";
+  ctx.fillStyle = T.stripe;
   for (let i = 0; i < 10; i += 2) ctx.fillRect(i * W / 10, 0, W / 10, H);
-  ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 3;
+  // zones de camp pendant le placement
+  if (phase === "setup") {
+    ctx.fillStyle = "rgba(220,90,110,0.10)"; ctx.fillRect(10, 10, W / 2 - 10, H - 20);
+    ctx.fillStyle = "rgba(80,155,220,0.12)"; ctx.fillRect(W / 2, 10, W / 2 - 10, H - 20);
+    ctx.font = "700 15px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.fillText("CAMP 🔴" + (mode === "ai" ? " (toi)" : ""), W / 4, 32);
+    ctx.fillText(mode === "ai" ? "CAMP 🤖 IA" : "CAMP 🔵", 3 * W / 4, 32);
+  }
+  ctx.strokeStyle = T.line; ctx.lineWidth = 3;
   ctx.strokeRect(8, 8, W - 16, H - 16);
   ctx.beginPath(); ctx.moveTo(W / 2, 8); ctx.lineTo(W / 2, H - 8); ctx.stroke();
   ctx.beginPath(); ctx.arc(W / 2, H / 2, 70, 0, Math.PI * 2); ctx.stroke();
@@ -696,6 +801,25 @@ function draw() {
     ctx.fillText((goalScorer === 1 ? "Rouge" : "Bleu") + " marque", W / 2, H / 2 - 20);
   }
   if (phase === "over") { ctx.fillStyle = "rgba(10,16,26,0.5)"; ctx.fillRect(0, 0, W, H); }
+  // bannière « À toi de jouer »
+  if (phase === "aim" && mode !== null) {
+    let banner = null;
+    if (mode === "local") banner = turn === 1 ? "🔴 AU TOUR DE ROUGE" : "🔵 AU TOUR DE BLEU";
+    else if (mode === "ai") banner = turn === 1 ? "👉 À TOI DE JOUER" : "🤖 L'IA réfléchit…";
+    else banner = turn === mySide ? "👉 À TOI DE JOUER" : "⏳ Tour de l'adversaire…";
+    const mine = mode === "local" ? true : (mode === "ai" ? turn === 1 : turn === mySide);
+    if (banner) drawBanner(banner, mine);
+  }
+  if (phase === "benshot") {
+    const ball = bodies[8];
+    const pulse = 5 + Math.sin(Date.now() / 130) * 4;
+    ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r + pulse + 6, 0, Math.PI * 2);
+    ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 4; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ball.x, ball.y - 46); ctx.lineTo(ball.x, ball.y - 30);
+    ctx.moveTo(ball.x - 8, ball.y - 38); ctx.lineTo(ball.x, ball.y - 46); ctx.lineTo(ball.x + 8, ball.y - 38);
+    ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 3; ctx.stroke();
+    drawBanner(isActingPlayer() || mode === "local" ? "🎁 TIR GRATUIT — TIRE SUR LE BALLON !" : "🎁 Tir gratuit adverse…", true);
+  }
   // bouton de ressuscitation visible si le joueur actif a un jeton éliminé
   const rev = $("reviveBtn");
   if (phase === "aim" && isActingPlayer() && ownDeadIdx(turn).length > 0) rev.style.display = "block";
@@ -706,11 +830,29 @@ function draw() {
     setStatus("🧩 Placement : " + who + " (pas de chevauchement, hors but) puis valide en bas.");
   } else if (phase === "aim" && mode) {
     const mine = mode === "local" || turn === mySide || (mode === "ai" && turn === 1);
-    if (mine) setStatus("Tour : tire en arrière sur un jeton" + (turnInfo.bonusActive ? " — 🎁 pichenette bonus" : "") + (ownDeadIdx(turn).length ? " OU 🩹 ressuscite (bouton en bas à gauche)" : "") + ".");
+    if (mine) setStatus("👉 À TOI DE JOUER — tire en arrière sur un de tes jetons" + (turnInfo.bonusActive ? " — 🎁 pichenette bonus" : "") + (ownDeadIdx(turn).length ? " OU 🩹 ressuscite (bouton en bas à gauche)" : "") + ". Astuce : clique (sans tirer) sur un jeton pour revoir sa fiche.");
     else if (mode === "ai") setStatus("🤖 L'IA réfléchit…");
     else setStatus("⏳ Tour de l'adversaire…");
-  } else if (phase === "benshot" && (mode !== "guest" || isActingPlayer())) setStatus("🔵 BenP : tir gratuit — tire en arrière sur le ballon depuis sa position.");
+  } else if (phase === "benshot" && (mode !== "guest" || isActingPlayer())) setStatus(isActingPlayer() ? "🎁 BENP : TIR GRATUIT — À TOI DE JOUER : tire en arrière sur le ballon (cercle jaune) !" : "🎁 BenP offre un tir gratuit à l'adversaire…");
   else if (phase === "synfo_pick" && (mode !== "guest" || isActingPlayer())) setStatus("🎯 Passe : clique sur le jeton allié qui reçoit le ballon.");
+}
+function drawBanner(text, mine) {
+  ctx.save();
+  ctx.font = "800 " + (26 + Math.sin(Date.now() / 200) * 1.5) + "px system-ui";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const w = ctx.measureText(text).width + 44;
+  const x = W / 2, y = 52;
+  ctx.beginPath();
+  const r = 16, x0 = x - w / 2, x1 = x + w / 2, y0 = y - 22, y1 = y + 22;
+  ctx.moveTo(x0 + r, y0); ctx.lineTo(x1 - r, y0); ctx.arcTo(x1, y0, x1, y0 + r, r);
+  ctx.lineTo(x1, y1 - r); ctx.arcTo(x1, y1, x1 - r, y1, r);
+  ctx.lineTo(x0 + r, y1); ctx.arcTo(x0, y1, x0, y1 - r, r);
+  ctx.lineTo(x0, y0 + r); ctx.arcTo(x0, y0, x0 + r, y0, r);
+  ctx.fillStyle = mine ? "rgba(255,209,102,0.92)" : "rgba(30,42,62,0.85)";
+  ctx.fill();
+  ctx.fillStyle = mine ? "#221a05" : "#dfe8f5";
+  ctx.fillText(text, x, y + 1);
+  ctx.restore();
 }
 function drawGoal(goal, col) {
   ctx.save();
@@ -757,10 +899,11 @@ function drawBall(b) {
   ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 2, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill();
   ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-  ctx.fillStyle = "#f5f0e6"; ctx.fill();
-  ctx.strokeStyle = "#333"; ctx.lineWidth = 1.5; ctx.stroke();
+  const T = TERRAINS[terrain];
+  ctx.fillStyle = T.ball; ctx.fill();
+  ctx.strokeStyle = T.dot; ctx.lineWidth = 1.5; ctx.stroke();
   ctx.beginPath(); ctx.arc(b.x, b.y, b.r * .45, 0, Math.PI * 2);
-  ctx.fillStyle = "#333"; ctx.fill();
+  ctx.fillStyle = T.dot; ctx.fill();
   ctx.restore();
 }
 function drawBench() {
@@ -977,9 +1120,9 @@ function mqConnect() {
     clearTimeout(brokerTmr);
     mq.subscribe(netRole === "host" ? T.g : T.h, { qos: 0 });
     if (netRole === "guest") {
-      sendRaw(T.g, { t: "hello" });
+      sendRaw(T.g, helloMsg());
       clearInterval(helloTmr);
-      helloTmr = setInterval(() => { if (!netUp) sendRaw(T.g, { t: "hello" }); }, 1500);
+      helloTmr = setInterval(() => { if (!netUp) sendRaw(T.g, helloMsg()); }, 1500);
       clearTimeout(joinTmr);
       joinTmr = setTimeout(() => {
         if (!netUp) {
@@ -995,11 +1138,14 @@ function mqConnect() {
     if (!m || !m.t) return;
     if (m.t === "bye") { if (mode) { setStatus("🔌 L'adversaire s'est déconnecté."); phase = "over"; } return; }
     if (netRole === "host" && m.t === "hello") {
-      if (!netUp) { netUp = true; sendRaw(T.h, { t: "welcome" }); hide("hostLobby"); startGame("host", 1); }
-      else sendRaw(T.h, { t: "welcome" });
+      if (m.name) oppProfile = { name: m.name, elo: m.elo || ELO_START };
+      if (!netUp) { netUp = true; sendRaw(T.h, welcomeMsg()); hide("hostLobby"); startGame("host", 1); }
+      else sendRaw(T.h, welcomeMsg());
       return;
     }
     if (netRole === "guest" && m.t === "welcome") {
+      if (m.name) oppProfile = { name: m.name, elo: m.elo || ELO_START };
+      $("btnDoJoin").disabled = false; $("btnDoJoin").textContent = "Rejoindre";
       if (!netUp) { netUp = true; clearTimeout(joinTmr); clearInterval(helloTmr); hide("joinLobby"); startGame("guest", 2); }
       return;
     }
@@ -1007,10 +1153,13 @@ function mqConnect() {
   });
   mq.on("error", () => {});
 }
-function startHost() {
+function startHost(opts) {
+  opts = opts || {};
   if (!netAvailable()) { alert("La bibliothèque réseau n'a pas pu être chargée — vérifie ta connexion internet (ou un bloqueur de publicités) puis recharge la page."); return; }
   hide("menu"); show("hostLobby");
-  roomCode = randCode();
+  roomCode = opts.code || randCode();
+  ranked = !!opts.ranked;
+  if (opts.opp) oppProfile = opts.opp;
   $("hostCode").textContent = roomCode;
   $("hostState").innerHTML = '<span class="spinner"></span>En attente de l\u2019adversaire…';
   netRole = "host"; netUp = false;
@@ -1025,12 +1174,13 @@ function startJoin() {
   $("joinCode").value = "";
   $("joinCode").focus();
 }
-function doJoin() {
-  const code = $("joinCode").value.trim().toUpperCase();
+function doJoin(codeOverride, opp) {
+  const code = (codeOverride || $("joinCode").value.trim()).toUpperCase();
   if (code.length !== 4) { alert("Entre le code à 4 caractères."); return; }
   $("btnDoJoin").disabled = true;
   $("btnDoJoin").textContent = "Connexion…";
   roomCode = code; netRole = "guest"; netUp = false;
+  if (opp) oppProfile = opp;
   mqConnect();
 }
 function sendMsg(m) {
@@ -1040,7 +1190,7 @@ function sendMsg(m) {
 }
 function broadcastState() {
   if (mode === "host") {
-    sendMsg({ t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady });
+    sendMsg({ t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady, terrain });
   }
 }
 function onMsg(m) {
@@ -1067,6 +1217,7 @@ function onMsg(m) {
     bodies = m.bodies; scores = m.scores; turn = m.turn; actPlayer = m.actPlayer || m.turn;
     goalScorer = m.goalScorer;
     if (m.turnInfo) turnInfo = m.turnInfo;
+    if (m.terrain && TERRAINS[m.terrain]) terrain = m.terrain;
     const prevPhase = phase;
     phase = m.phase;
     if (phase === "setup") {
@@ -1078,9 +1229,114 @@ function onMsg(m) {
     if (m.phase === "over" && prevPhase !== "over") endGame(m.goalScorer);
     if ((prevPhase === "synfo_choice" || prevPhase === "synfo_pick") && phase !== "synfo_choice" && phase !== "synfo_pick") hide("synfoPanel");
     updateBar(m.turnInfo ? m.turnInfo.bonusActive : false);
+  } else if (m.t === "elo" && mode === "guest") {
+    const p = getProfile();
+    p.elo = m.yourElo;
+    if (m.delta >= 0) p.w++; else p.l++;
+    saveProfile(p);
+    $("winText").textContent += " — Elo : " + m.yourElo + " (" + (m.delta >= 0 ? "+" : "") + m.delta + ")";
   } else if (m.t === "rematch" && mode === "host") {
     rematch();
   }
+}
+
+// ---------- Profil, Elo, queue & classement ----------
+const ELO_START = 1000, ELO_K = 32;
+let ranked = false, oppProfile = null;
+let queueMq = null, queueTmr = null, myQid = null, ladderMq = null;
+function loadProfile() { try { const p = JSON.parse(localStorage.getItem("pichn_profile")); if (p && p.name) return p; } catch (e) {} return null; }
+function getProfile() { return loadProfile() || { name: "", elo: ELO_START, w: 0, l: 0 }; }
+function saveProfile(p) { try { localStorage.setItem("pichn_profile", JSON.stringify(p)); } catch (e) {} }
+function expectedElo(a, b) { return 1 / (1 + Math.pow(10, (b - a) / 400)); }
+function helloMsg() { const p = getProfile(); return { t: "hello", name: p.name || "Anonyme", elo: p.elo }; }
+function welcomeMsg() { const p = getProfile(); return { t: "welcome", name: p.name || "Anonyme", elo: p.elo }; }
+function pubLadder(e) { try { if (mq && mq.connected) mq.publish("pichn/ladder/" + e.name, JSON.stringify({ n: e.name, e: e.elo, w: e.w || 0, l: e.l || 0, ts: Date.now() }), { qos: 0, retain: true }); } catch (err) {} }
+function settleElo(hostWon) {
+  const me = getProfile(); const opp = oppProfile || { name: "Anonyme", elo: ELO_START };
+  const myDelta = Math.round(ELO_K * ((hostWon ? 1 : 0) - expectedElo(me.elo, opp.elo)));
+  const oppDelta = -myDelta;
+  const myNew = me.elo + myDelta, oppNew = opp.elo + oppDelta;
+  me.elo = myNew; if (hostWon) me.w++; else me.l++;
+  saveProfile(me);
+  $("winText").textContent = (hostWon ? "🏆 Rouge gagne !" : "🏆 Bleu gagne !") + " — Elo : " + myNew + " (" + (myDelta >= 0 ? "+" : "") + myDelta + ")";
+  pubLadder({ name: me.name, elo: myNew, w: me.w, l: me.l });
+  pubLadder({ name: opp.name, elo: oppNew, w: (opp.w || 0) + (hostWon ? 0 : 1), l: (opp.l || 0) + (hostWon ? 1 : 0) });
+  sendMsg({ t: "elo", yourElo: oppNew, delta: oppDelta });
+}
+function startQueue() {
+  const prof = getProfile();
+  if (!prof.name) { show("pseudoPanel"); $("pseudoInput").focus(); return; }
+  ranked = true;
+  hide("menu"); show("queuePanel");
+  $("queueState").textContent = "Recherche d'un adversaire classé…";
+  myQid = Math.random().toString(36).slice(2, 10);
+  queueMq = mqtt.connect(MQTT_URL, { clientId: "pichn-q-" + myQid, keepalive: 30, clean: true, reconnectPeriod: 3000, connectTimeout: 8000 });
+  queueMq.on("connect", () => {
+    queueMq.subscribe("pichn/queue", { qos: 0 });
+    const p2 = getProfile();
+    const ann = () => { try { queueMq.publish("pichn/queue", JSON.stringify({ t: "q", id: myQid, name: p2.name, elo: p2.elo })); } catch (e) {} };
+    ann();
+    queueTmr = setInterval(ann, 1500);
+  });
+  queueMq.on("message", (topic, payload) => {
+    let m; try { m = JSON.parse(payload.toString()); } catch (e) { return; }
+    if (m.t === "q" && m.id && m.id !== myQid) {
+      // règle déterministe : le plus grand id héberge le match
+      if (myQid > m.id) {
+        // terrain aléatoire en classé
+        const terrains = ["pelouse", "glace", "terre"];
+        terrain = terrains[Math.floor(Math.random() * terrains.length)];
+        refreshTerrainBtns();
+        $("queueState").textContent = "⚔️ Adversaire trouvé : " + m.name + " (" + m.elo + ") — terrain : " + TERRAINS[terrain].emoji + " " + TERRAINS[terrain].name + " !";
+        const code = randCode();
+        for (let i = 0; i < 4; i++) setTimeout(() => { try { queueMq.publish("pichn/queue", JSON.stringify({ t: "invite", to: m.id, code, name: getProfile().name, elo: getProfile().elo })); } catch (e) {} }, i * 300);
+        setTimeout(() => { stopQueue(true); hide("queuePanel"); startHost({ code, ranked: true, opp: { name: m.name, elo: m.elo } }); }, 1600);
+      }
+    } else if (m.t === "invite" && m.to === myQid) {
+      $("queueState").textContent = "⚔️ Adversaire trouvé : " + (m.name || "?") + " (" + (m.elo || ELO_START) + ") — terrain annoncé par l'hôte…";
+      const invite = m;
+      setTimeout(() => { stopQueue(true); hide("queuePanel"); doJoin(invite.code, { name: invite.name, elo: invite.elo || ELO_START }); }, 1300);
+    }
+  });
+}
+function stopQueue(endClient) {
+  clearInterval(queueTmr); queueTmr = null;
+  if (endClient) { try { if (queueMq) queueMq.end(true); } catch (e) {} queueMq = null; }
+}
+function openLadder() {
+  show("ladderPanel");
+  if (!netAvailable()) { $("ladderBody").innerHTML = "<tr><td colspan='4'>Bibliothèque réseau non chargée.</td></tr>"; return; }
+  if (ladderMq) { try { ladderMq.end(true); } catch (e) {} }
+  const seen = {};
+  ladderMq = mqtt.connect(MQTT_URL, { clientId: "pichn-l-" + Math.random().toString(36).slice(2, 8), clean: true, reconnectPeriod: 3000, connectTimeout: 8000 });
+  ladderMq.on("connect", () => ladderMq.subscribe("pichn/ladder/+", { qos: 0 }));
+  ladderMq.on("message", (topic, payload) => {
+    try { const m = JSON.parse(payload.toString()); if (m && m.n) seen[m.n] = m; } catch (e) {}
+    renderLadder(seen);
+  });
+}
+function renderLadder(seen) {
+  const rows = Object.values(seen).sort((a, b) => b.e - a.e);
+  const me = getProfile();
+  let html = rows.map((r, i) => "<tr" + (r.n === me.name ? " class='me'" : "") + "><td>" + (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1) + "</td><td>" + String(r.n).replace(/[<>&]/g, "") + "</td><td>" + r.e + "</td><td>" + (r.w || 0) + "V - " + (r.l || 0) + "D</td></tr>").join("");
+  if (!rows.length) html = "<tr><td colspan='4'>Aucun joueur classé pour l'instant — lance une partie classée !</td></tr>";
+  $("ladderBody").innerHTML = html;
+}
+// ---------- Fiche personnage ----------
+const CHAR_INFO = {
+  drasah: "Jouable deux fois de suite : le jouer offre une 2e pichenette immédiate (une fois, pas de chaîne).",
+  wun: "Retourne tout jeton adverse qu'il touche, à tout moment (jeton mort : ne se joue plus mais bloque). Ranimable uniquement par le contact d'un jeton allié.",
+  benp: "Si le ballon le touche (même pendant le tour adverse), à la fin de la course du ballon son camp obtient un tir gratuit depuis la position du ballon.",
+  synfo: "Si le ballon la touche, à la fin de la course : laisser le ballon OU passe : choisis l'allié puis oriente librement le ballon autour de lui. Combo : une passe à BenP déclenche son tir gratuit !"
+};
+let charTmr = null;
+function showCharPanel(char) {
+  $("charPanelImg").src = AVATAR_DATA[char];
+  $("charPanelName").textContent = CHAR_NAMES[char];
+  $("charPanelDesc").textContent = CHAR_INFO[char] || "";
+  $("charPanel").classList.remove("hidden");
+  clearTimeout(charTmr);
+  charTmr = setTimeout(() => $("charPanel").classList.add("hidden"), 9000);
 }
 
 // ---------- Partie ----------
@@ -1123,13 +1379,14 @@ function endGame(winner) {
   $("winText").textContent = winner === 1 ? "🏆 Rouge gagne !" : "🏆 Bleu gagne !";
   show("winOverlay"); updateBar();
   if (mode === "host") broadcastState();
+  if (ranked && mode === "host" && oppProfile) settleElo(winner === 1);
 }
 function rematch() {
   startSetup();
   if (mode === "host") broadcastState();
 }
 function backMenu() {
-  cleanupNet(); clearTimeout(aiTimer); mode = null;
+  cleanupNet(); clearTimeout(aiTimer); mode = null; ranked = false; oppProfile = null;
   $("setupBtn").style.display = "none";
   $("reviveBtn").style.display = "none";
   hide("winOverlay"); hide("synfoPanel"); hide("revivePanel"); show("menu");
@@ -1206,11 +1463,33 @@ $("btnRematch").onclick = () => {
 };
 $("btnBackMenu").onclick = backMenu;
 
+// ---------- Boutons v2 : queue, classement, terrains, fiche ----------
+$("btnRanked").onclick = () => { if (!netAvailable()) { alert("La bibliothèque réseau n'a pas pu être chargée — vérifie ta connexion internet puis recharge la page."); return; } startQueue(); };
+$("btnLadder").onclick = openLadder;
+$("btnCloseLadder").onclick = () => { hide("ladderPanel"); try { if (ladderMq) ladderMq.end(true); } catch (e) {} ladderMq = null; };
+$("btnCancelQueue").onclick = () => { stopQueue(true); ranked = false; oppProfile = null; hide("queuePanel"); show("menu"); };
+$("btnPseudoOk").onclick = () => {
+  const v = $("pseudoInput").value.trim().slice(0, 15);
+  if (v.length < 2) { alert("Entre au moins 2 caractères."); return; }
+  const p = getProfile(); p.name = v; saveProfile(p);
+  hide("pseudoPanel"); updateBar(); startQueue();
+};
+$("btnPseudoCancel").onclick = () => hide("pseudoPanel");
+$("btnCloseChar").onclick = () => $("charPanel").classList.add("hidden");
+function refreshTerrainBtns() {
+  document.querySelectorAll(".tbtn").forEach((b) => b.classList.toggle("sel", b.dataset.terrain === terrain));
+}
+document.querySelectorAll(".tbtn").forEach((b) => {
+  b.onclick = () => { terrain = b.dataset.terrain; try { localStorage.setItem("pichn_terrain", terrain); } catch (e) {} refreshTerrainBtns(); updateBar(); };
+});
+try { terrain = localStorage.getItem("pichn_terrain") || "pelouse"; } catch (e) {}
+refreshTerrainBtns();
+
 resetPositions();
 updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="xzu+JceH9BCPzFtaZNh5Kw==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="kAtgSMwvOT4C6I7yX9nPvQ==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
