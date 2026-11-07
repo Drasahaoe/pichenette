@@ -153,7 +153,7 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.2/dist/mqtt.min.js"></script>
 <script>
 "use strict";
 // ================================================================
@@ -210,7 +210,7 @@ let actPlayer = 1;         // joueur qui agit maintenant (flick, tir gratuit, ch
 let phase = "setup";       // setup | aim | moving | benshot | synfo_choice | synfo_pick | revive_pick | goal | over
 let mode = null;           // local | host | guest | ai
 let mySide = 0;
-let peer = null, conn = null;
+let peer = null, conn = null; // obsolètes (ancien PeerJS) — conservés pour compat
 let goalTimer = 0, goalScorer = 0, lastMsg = 0;
 let benpToken = -1, synfoToken = -1, passTarget = -1;
 let pend = { benp: -1, synfo: -1 }; // triggers à la fin de la trajectoire du ballon
@@ -948,37 +948,79 @@ function aiSetup() {
   saveSideSetup(2);
 }
 
-// ---------- Réseau ----------
-const PREFIX = "pichn-";
-function peerAvailable() { return typeof Peer !== "undefined"; }
+// ---------- Réseau (broker MQTT public — remplace PeerJS) ----------
+const MQTT_URL = "wss://broker.emqx.io:8084/mqtt";
+let mq = null, netRole = null, netUp = false, roomCode = "", joinTmr = null, helloTmr = null, brokerTmr = null;
+function netAvailable() { return typeof mqtt !== "undefined" && typeof mqtt.connect === "function"; }
 function randCode() {
   const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
   for (let i = 0; i < 4; i++) s += c[Math.floor(Math.random() * c.length)];
   return s;
 }
+function topics(code) { return { h: "pichn/" + code + "/h", g: "pichn/" + code + "/g" }; }
 function cleanupNet() {
-  try { if (conn) conn.close(); } catch (e) {}
-  try { if (peer) peer.destroy(); } catch (e) {}
-  conn = null; peer = null;
+  clearTimeout(joinTmr); clearInterval(helloTmr); clearTimeout(brokerTmr);
+  try { if (mq) mq.end(true); } catch (e) {}
+  mq = null; netRole = null; netUp = false; roomCode = "";
+}
+function sendRaw(topic, m) { try { if (mq && mq.connected) mq.publish(topic, JSON.stringify(m)); } catch (e) {} }
+function mqConnect() {
+  const T = topics(roomCode);
+  const willTopic = netRole === "host" ? T.h : T.g;
+  mq = mqtt.connect(MQTT_URL, {
+    clientId: "pichn-" + (netRole === "host" ? "h" : "g") + "-" + roomCode.toLowerCase() + "-" + Math.random().toString(36).slice(2, 8),
+    keepalive: 30, clean: true, reconnectPeriod: 3000, connectTimeout: 8000,
+    will: { topic: willTopic, payload: JSON.stringify({ t: "bye" }), qos: 0, retain: false }
+  });
+  mq.on("connect", () => {
+    clearTimeout(brokerTmr);
+    mq.subscribe(netRole === "host" ? T.g : T.h, { qos: 0 });
+    if (netRole === "guest") {
+      sendRaw(T.g, { t: "hello" });
+      clearInterval(helloTmr);
+      helloTmr = setInterval(() => { if (!netUp) sendRaw(T.g, { t: "hello" }); }, 1500);
+      clearTimeout(joinTmr);
+      joinTmr = setTimeout(() => {
+        if (!netUp) {
+          cleanupNet();
+          $("btnDoJoin").disabled = false; $("btnDoJoin").textContent = "Rejoindre";
+          alert("Partie introuvable — vérifie le code et que l'hôte ait bien créé sa partie.");
+        }
+      }, 12000);
+    }
+  });
+  mq.on("message", (topic, payload) => {
+    let m = null; try { m = JSON.parse(payload.toString()); } catch (e) { return; }
+    if (!m || !m.t) return;
+    if (m.t === "bye") { if (mode) { setStatus("🔌 L'adversaire s'est déconnecté."); phase = "over"; } return; }
+    if (netRole === "host" && m.t === "hello") {
+      if (!netUp) { netUp = true; sendRaw(T.h, { t: "welcome" }); hide("hostLobby"); startGame("host", 1); }
+      else sendRaw(T.h, { t: "welcome" });
+      return;
+    }
+    if (netRole === "guest" && m.t === "welcome") {
+      if (!netUp) { netUp = true; clearTimeout(joinTmr); clearInterval(helloTmr); hide("joinLobby"); startGame("guest", 2); }
+      return;
+    }
+    onMsg(m);
+  });
+  mq.on("error", () => {});
 }
 function startHost() {
-  if (!peerAvailable()) { alert("Le mode en ligne nécessite d'ouvrir le fichier téléchargé directement dans ton navigateur (l'aperçu intégré bloque la connexion). Télécharge le fichier puis rouvre-le."); return; }
+  if (!netAvailable()) { alert("La bibliothèque réseau n'a pas pu être chargée — vérifie ta connexion internet (ou un bloqueur de publicités) puis recharge la page."); return; }
   hide("menu"); show("hostLobby");
-  const code = randCode();
-  $("hostCode").textContent = code;
+  roomCode = randCode();
+  $("hostCode").textContent = roomCode;
   $("hostState").innerHTML = '<span class="spinner"></span>En attente de l\u2019adversaire…';
-  peer = new Peer(PREFIX + code, { debug: 0 });
-  peer.on("error", (err) => { $("hostState").innerHTML = "❌ Erreur : " + err.type + " — réessaie."; });
-  peer.on("connection", (c) => {
-    if (conn) { try { c.close(); } catch (e) {} return; }
-    conn = c;
-    conn.on("open", () => { hide("hostLobby"); startGame("host", 1); });
-    wireConn();
-  });
+  netRole = "host"; netUp = false;
+  mqConnect();
+  brokerTmr = setTimeout(() => {
+    if (!mq || !mq.connected) $("hostState").innerHTML = "❌ Impossible de joindre le serveur de jeu — vérifie ta connexion et réessaie.";
+  }, 10000);
 }
 function startJoin() {
-  if (!peerAvailable()) { alert("Le mode en ligne nécessite d'ouvrir le fichier téléchargé directement dans ton navigateur."); return; }
+  if (!netAvailable()) { alert("La bibliothèque réseau n'a pas pu être chargée — vérifie ta connexion internet (ou un bloqueur de publicités) puis recharge la page."); return; }
   hide("menu"); show("joinLobby");
   $("joinCode").value = "";
   $("joinCode").focus();
@@ -988,28 +1030,14 @@ function doJoin() {
   if (code.length !== 4) { alert("Entre le code à 4 caractères."); return; }
   $("btnDoJoin").disabled = true;
   $("btnDoJoin").textContent = "Connexion…";
-  peer = new Peer({ debug: 0 });
-  peer.on("open", () => {
-    conn = peer.connect(PREFIX + code, { reliable: true });
-    wireConn();
-    const to = setTimeout(() => {
-      if (!conn || !conn.open) {
-        $("btnDoJoin").disabled = false; $("btnDoJoin").textContent = "Rejoindre";
-        alert("Partie introuvable — vérifie le code et que l'hôte ait bien créé sa partie.");
-      }
-    }, 12000);
-    conn.on("open", () => { clearTimeout(to); hide("joinLobby"); startGame("guest", 2); });
-  });
-  peer.on("error", (err) => {
-    $("btnDoJoin").disabled = false; $("btnDoJoin").textContent = "Rejoindre";
-    alert("Erreur de connexion : " + err.type);
-  });
+  roomCode = code; netRole = "guest"; netUp = false;
+  mqConnect();
 }
-function wireConn() {
-  conn.on("data", (msg) => onMsg(msg));
-  conn.on("close", () => { if (mode) { setStatus("🔌 L'adversaire s'est déconnecté."); phase = "over"; } });
+function sendMsg(m) {
+  if (!netUp || !mq || !mode) return;
+  const T = topics(roomCode);
+  sendRaw(mode === "host" ? T.h : T.g, m);
 }
-function sendMsg(m) { try { if (conn && conn.open) conn.send(m); } catch (e) {} }
 function broadcastState() {
   if (mode === "host") {
     sendMsg({ t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady });
@@ -1183,6 +1211,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="hhhRTfuQ9bKZoldaBSU9Cg==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="xzu+JceH9BCPzFtaZNh5Kw==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
