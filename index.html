@@ -70,6 +70,9 @@
   .dchar.sel { border-color: #ffd166; background: rgba(255,209,102,.12); box-shadow: 0 0 8px rgba(255,209,102,.4); }
   .dchar img { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #4f7ab0; }
   .dph { width: 44px; height: 44px; border-radius: 50%; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 15px; border: 2px solid #4f7ab0; }
+  .dchar.taken { opacity: .45; cursor: default; border-color: #3b5170; }
+  .dchar.pickable { border-color: #ffd166; box-shadow: 0 0 10px rgba(255,209,102,.5); cursor: pointer; }
+  .dchar.pickable:hover { transform: scale(1.08); border-color: #ffe9a8; }
   .hidden { display: none !important; }
   .small { font-size: 12.5px; opacity: .7; margin-top: 6px; line-height: 1.5; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #ffd166; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; vertical-align: -2px; margin-right: 6px; }
@@ -152,7 +155,7 @@
     </div>
     <div class="rules">
       <b>But du jeu :</b> propulse le ballon dans le but adverse. Tu ne touches <b>jamais</b> le ballon directement — uniquement tes jetons (fronde : maintiens, tire en arrière, relâche). Premier à <b>5 points</b>. Le but est <b>plus petit que le ballon</b> : vise juste !<br/><b>Pas de bords :</b> ce qui sort du terrain est sorti — le ballon est remis au centre, un jeton éliminé se ressuscite à ton tour (collé à ton but, au prix de ton coup). <b>Exception : sur 🧊 Glace, des bordures renvoient tout dans le terrain — rien ne sort, tout rebondit.</b><br/>
-      <b>Personnages</b> — <b>draft</b> : chaque joueur choisit <b>4 personnages parmi 8</b> avant la partie (les deux camps peuvent choisir les mêmes) :
+      <b>Personnages</b> — <b>draft</b> : chaque joueur choisit <b>4 personnages parmi 8</b>. En <b>ami / local / IA</b> : les deux camps peuvent choisir les mêmes. En <b>classé</b> : draft <b>alterné</b> (premier choix, puis chacun son tour), <b>10 s par choix</b> sinon aléatoire, un perso pris n'est plus disponible pour l'adversaire :
       <div class="ch"><img id="miniDrasah" alt="Drasah"/><span><b>Drasah</b> — peut être joué deux fois de suite : le jouer offre une 2e pichenette immédiate (une fois, pas de chaîne).</span></div>
       <div class="ch"><img id="miniWun" alt="Wun"/><span><b>Wun</b> — retourne tout jeton adverse qu'il touche, <b>à tout moment</b> (jeton mort : ne se joue plus mais bloque). Ranimable uniquement par le contact d'un jeton allié. Deux Wun qui se touchent : celui du joueur qui attaque gagne.</span></div>
       <div class="ch"><img id="miniBenp" alt="BenP"/><span><b>BenP</b> — si le <b>ballon le touche</b> (même pendant le tour adverse), à la fin de la course du ballon son camp obtient un <b>tir gratuit</b> depuis la position du ballon.</span></div>
@@ -230,7 +233,7 @@
 <div class="overlay hidden" id="draftPanel">
   <div class="card">
     <h2 id="draftTitle">🃏 Draft — choisis tes 4 personnages</h2>
-    <div class="sub">Choisis <b>4 personnages parmi 8</b> — les deux camps peuvent choisir les mêmes. Glisse-survole un nom pour voir son effet.</div>
+    <div class="sub" id="draftSub">Choisis <b>4 personnages parmi 8</b> — les deux camps peuvent choisir les mêmes. Glisse-survole un nom pour voir son effet.</div>
     <div id="draftGrid"></div>
     <div class="sub" id="draftCount">0 / 4</div>
     <button class="btn primary" id="btnDraftOk">✅ Valider mon équipe</button>
@@ -409,6 +412,7 @@ let chatOpen = false, chatUnread = 0;
 let fx = [];               // particules locales (cosmétique uniquement, jamais diffusées)
 // v8 : draft, nouveaux persos
 let draftReady = { 1: false, 2: false };      // chaque camp a validé sa sélection
+let snake = false, snakeTurn = 1, snakePool = [], pickDeadline = 0, firstPick = 1; // draft alterné (classé) : chacun son tour, 10 s par pick
 let drafts = { 1: null, 2: null };            // chars choisis par camp : ["drasah",...]
 let draftDeadline = 0;                        // timer de draft (45 s)
 let draftSel = [];                            // sélection en cours dans le panneau
@@ -810,7 +814,8 @@ function endTurn() {
   }
   leureTouched = [];
   if (turnInfo.drasahExtra) {
-    turnInfo.drasahExtra = false;
+    // le rejoue n'est PAS consommé ici : applyFlick() le consomme (sinon canFlick/applyFlick
+    // n'ont plus aucune ressource et le rejoue de Drasah devient impossible)
     phase = "aim"; actPlayer = turn;
     armTimer(30000);
     flash("🎁 Drasah : rejoue une 2e pichenette !");
@@ -952,6 +957,7 @@ function applyAct(kind, d) {
   } else if (kind === "miz_pass" && phase === "mizterio_pick") {
     mizCands = []; mizEnemy = -1; inResolution = false;
     setStatus("▶️ Mizterio laisse tomber l'échange.");
+    phase = "aim"; // quitter mizterio_* AVANT endTurn (sinon resolveMizterio intercepte à l'infini)
     endTurn();
     return;
   } else if (kind === "trig_choice" && phase === "triggerchoice") {
@@ -1105,9 +1111,21 @@ function randomDraft() {
 function startDraft() {
   phase = "draft";
   draftReady = { 1: false, 2: false };
-  drafts = { 1: null, 2: null };
   draftSel = [];
-  draftDeadline = Date.now() + 45000;
+  // Draft alterné (classé uniquement) : premier choix, puis chacun son tour, 10 s par pick.
+  snake = !!(ranked && (mode === "host" || mode === "guest"));
+  if (snake) {
+    drafts = { 1: [], 2: [] };
+    snakePool = CHARS.slice();
+    firstPick = mode === "host" ? (Math.random() < 0.5 ? 1 : 2) : firstPick; // l'hôte tire la pièce, l'invité le reçoit par l'état
+    snakeTurn = firstPick;
+    pickDeadline = Date.now() + 10000;
+    draftDeadline = 0;
+  } else {
+    drafts = { 1: null, 2: null };
+    draftDeadline = Date.now() + 45000;
+    pickDeadline = 0;
+  }
   armTimer(0);
   drag = null; wallAim = false;
   walls = { 1: null, 2: null }; wallUsePos = { 1: null, 2: null };
@@ -1125,6 +1143,38 @@ function draftActorSide() {
 function buildDraftUI() {
   const grid = $("draftGrid");
   grid.innerHTML = "";
+  // ----- Draft alterné (classé) : chacun son tour, 10 s, perso pris = retiré du pool -----
+  if (snake) {
+    const myPick = (mode === "host" && snakeTurn === 1) || (mode === "guest" && snakeTurn === 2);
+    $("draftTitle").textContent = "🃏 Draft alterné (classé) — au tour de " + (snakeTurn === 1 ? "🔴 Rouge" : "🔵 Bleu") + (myPick ? " — À TOI !" : "…");
+    $("draftSub").innerHTML = "Draft <b>alterné</b> : premier choix, puis chacun son tour — <b>10 s</b> par choix sinon aléatoire. Un perso pris n'est plus disponible pour l'adversaire.";
+    for (const c of CHARS) {
+      const in1 = (drafts[1] || []).indexOf(c) >= 0, in2 = (drafts[2] || []).indexOf(c) >= 0;
+      const inPool = snakePool.indexOf(c) >= 0;
+      const item = document.createElement("div");
+      item.className = "dchar" + (in1 || in2 ? " taken" : "") + (inPool && myPick ? " pickable" : "");
+      if (AVATAR_DATA[c]) { const img = document.createElement("img"); img.src = AVATAR_DATA[c]; item.appendChild(img); }
+      else { const ph = document.createElement("div"); ph.className = "dph"; ph.style.background = CHAR_COLORS[c] || "#556"; ph.textContent = CHAR_NAMES[c].slice(0, 2).toUpperCase(); item.appendChild(ph); }
+      const nm = document.createElement("span");
+      nm.textContent = (in1 ? "🔴 " : "") + (in2 ? "🔵 " : "") + CHAR_NAMES[c];
+      nm.title = CHAR_INFO[c] || "";
+      item.appendChild(nm);
+      if (inPool && myPick) item.onclick = () => {
+        if (mode === "guest") sendMsg({ t: "draft_pick", char: c });
+        else draftPick(1, c);
+      };
+      grid.appendChild(item);
+    }
+    $("draftCount").textContent = "🔴 " + (drafts[1] || []).length + "/4 · 🔵 " + (drafts[2] || []).length + "/4 · pool : " + snakePool.length;
+    $("btnDraftOk").disabled = true;
+    $("btnDraftOk").style.display = "none";
+    if (mode === "spectator") return; // spectateur : infos seulement via le statut
+    show("draftPanel");
+    return;
+  }
+  // ----- Draft libre (ami / local / IA) : 4 parmi 8 en miroir -----
+  $("draftSub").innerHTML = "Choisis <b>4 personnages parmi 8</b> — les deux camps peuvent choisir les mêmes. Glisse-survole un nom pour voir son effet.";
+  $("btnDraftOk").style.display = "block";
   for (const c of CHARS) {
     const item = document.createElement("div");
     item.className = "dchar" + (draftSel.indexOf(c) >= 0 ? " sel" : "");
@@ -1162,6 +1212,7 @@ function buildDraftUI() {
   show("draftPanel");
 }
 function validateDraft() {
+  if (snake) return; // draft alterné : pas de validation globale, on pick un par un
   if (draftSel.length !== 4) return;
   if (mode === "local") {
     if (!draftReady[1]) {
@@ -1195,6 +1246,31 @@ function validateDraft() {
 function finishDraft() {
   hide("draftPanel");
   startSetup();
+}
+// Draft alterné : un pick autoritaire (hôte). side = camp qui pick, c = perso pris dans le pool.
+function draftPick(side, c) {
+  if (!snake || phase !== "draft") return;
+  if (side !== snakeTurn) return;
+  const k = snakePool.indexOf(c);
+  if (k < 0) return;
+  snakePool.splice(k, 1);
+  if (!Array.isArray(drafts[side])) drafts[side] = [];
+  drafts[side].push(c);
+  if (drafts[side].length >= 4) draftReady[side] = true;
+  sndTrig();
+  if (snakePool.length === 0) { flash("🃏 Draft terminé !"); finishDraft(); return; }
+  snakeTurn = snakeTurn === 1 ? 2 : 1;
+  pickDeadline = Date.now() + 10000;
+  buildDraftUI();
+  broadcastState();
+}
+// Draft alterné : 10 s écoulées → le camp en train de choisir reçoit un perso aléatoire du pool.
+function onPickTimeout() {
+  if (!snake || phase !== "draft" || mode !== "host") return;
+  const c = snakePool[Math.floor(Math.random() * snakePool.length)];
+  if (!c) { finishDraft(); return; }
+  flash("⏰ Temps écoulé — " + (snakeTurn === 1 ? "Rouge" : "Bleu") + " reçoit un perso au hasard !");
+  draftPick(snakeTurn, c);
 }
 function onDraftTimeout() {
   // random for whoever hasn't picked (executor: host / local / ai)
@@ -1567,7 +1643,7 @@ let lastTickSec = 0;
 function updateTimerPill() {
   const p = $("timerPill");
   if (!mode || phase === "over" || phase === "moving" || phase === "goal" || phase === "revive_pick") { p.classList.add("hidden"); return; }
-  const dl = phase === "draft" ? draftDeadline : (phase === "setup" ? setupDeadline : actionDeadline);
+  const dl = phase === "draft" ? (snake ? pickDeadline : draftDeadline) : (phase === "setup" ? setupDeadline : actionDeadline);
   if (!dl) { p.classList.add("hidden"); return; }
   const s = Math.ceil((dl - Date.now()) / 1000);
   if (s < 0) { p.classList.add("hidden"); return; }
@@ -1720,7 +1796,7 @@ function onActionTimeout() {
   else if (phase === "triggerchoice") { flash("⏰ Temps écoulé — effets perdus !"); trigOpts = []; hide("trigPanel"); endTurn(); }
   else if (phase === "cyrilou_choice") { flash("⏰ Temps écoulé — effet perdu !"); hide("cyrilouPanel"); applyAct("cyrilou_stay", {}); }
   else if (phase === "cyrilou_orient" || phase === "cyrilou_shot") { flash("⏰ Temps écoulé — tir de Cyrilou perdu !"); hide("cyrilouPanel"); endTurn(); }
-  else if (phase === "mizterio_pick" || phase === "mizterio_target") { flash("⏰ Temps écoulé — échange de Mizterio perdu !"); mizCands = []; mizEnemy = -1; hide("mizPanel"); endTurn(); }
+  else if (phase === "mizterio_pick" || phase === "mizterio_target") { flash("⏰ Temps écoulé — échange de Mizterio perdu !"); mizCands = []; mizEnemy = -1; hide("mizPanel"); phase = "aim"; endTurn(); }
 }
 function onSetupTimeout() {
   flash("⏰ Placement terminé — la partie commence !");
@@ -1735,6 +1811,7 @@ setInterval(() => {
   if (!mode || mode === "guest" || mode === "spectator") return;
   const now = Date.now();
   if (mode === "host") { for (const k in viewers) if (now - viewers[k] > 12000) delete viewers[k]; updateSpecPill(Object.keys(viewers).length, Object.keys(viewers)); }
+  if (phase === "draft" && snake && pickDeadline && now > pickDeadline) { onPickTimeout(); return; }
   if (phase === "draft" && draftDeadline && now > draftDeadline) { onDraftTimeout(); return; }
   if (phase === "setup" && setupDeadline && now > setupDeadline) { onSetupTimeout(); return; }
   if (actionDeadline && ACTION_PHASES.indexOf(phase) >= 0 && now > actionDeadline) onActionTimeout();
@@ -1850,49 +1927,61 @@ function simulateFlick(idx, vx, vy) {
   bodies = real; simActive = false;
   return res;
 }
+// IA : simulation de coups DÉCOUPÉE en petits lots asynchrones — l'interface ne gèle jamais,
+// même sur la glace (friction faible = simulations longues). Les meilleurs coups sont notés au fil de l'eau.
+let aiThinking = false;
 function aiPlay() {
   if (mode !== "ai" || turn !== 2 || phase !== "aim") return;
+  if (aiThinking) return;
   const deads = ownDeadIdx(2);
-  // candidats : chaque jeton, directions vers ballon / but adverse / jetons alliés (combos), 2 puissances
-  let best = null;
   const ball = bodies[8];
   const targets = [ball, GOAL_L];
-  for (let k = 4; k < 8; k++) if (bodies[k].alive && !bodies[k].out) targets.push(bodies[k]);
+  for (let k = 4; k < 8; k++) { const b = bodies[k]; if (b.alive && !b.out && (b.char === "benp" || b.char === "synfo" || b.char === "cyrilou")) targets.push(b); } // combos
+  const cands = [];
   for (let i = 4; i < 8; i++) {
     const t = bodies[i];
     if (!t.alive || t.out) continue;
     if (!canFlick(i)) continue;
     for (const tg of targets) {
       const base = Math.atan2(tg.y - t.y, tg.x - t.x);
-      for (const sp of [-0.3, 0, 0.3]) {
-        for (const pw of [0.7, 1.0]) {
-          const ang = base + sp;
-          const v = MAX_DRAG * POWER * pw;
-          const r = simulateFlick(i, Math.cos(ang) * v, Math.sin(ang) * v);
-          let score = 0;
-          if (r.goal === 2) score += 2000;
-          else if (r.goal === 1) score -= 2000;
-          score += (ball.x - r.ballX) * 2; // l'IA attaque vers la gauche
-          let kills = 0, losses = 0;
-          for (let k = 0; k < 8; k++) {
-            const before = bodies[k].alive && !bodies[k].out;
-            const after = r.end[k].alive && !r.end[k].out;
-            if (before && !after) { if (k < 4) kills++; else losses++; }
-          }
-          score += kills * 160 - losses * 160;
-          if (r.ballX === W / 2 && r.ballY === H / 2 && ball.x !== W / 2) score -= 60; // ballon sorti
-          score += Math.random() * 8;
-          if (!best || score > best.score) best = { idx: i, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v, score };
-        }
-      }
+      for (const sp of [-0.3, 0, 0.3]) cands.push({ i, ang: base + sp, pw: 1.0 });
     }
   }
-  if (deads.length && (!best || best.score < 20 || deads.length >= 2)) {
-    applyRevive(deads[0]);
-    return;
-  }
-  if (best) applyFlick(best.idx, best.vx, best.vy);
-  else if (deads.length) applyRevive(deads[0]);
+  let best = null;
+  const ballX0 = ball.x, ballY0 = ball.y;
+  const CH = 6; // simulations par lot
+  const step = () => {
+    if (mode !== "ai" || turn !== 2 || phase !== "aim") { aiThinking = false; return; } // la situation a changé : abandon
+    const end = Math.min(cands.length, (step.pos || 0) + CH);
+    for (; step.pos < end; step.pos++) {
+      const c = cands[step.pos];
+      const v = MAX_DRAG * POWER * c.pw;
+      const r = simulateFlick(c.i, Math.cos(c.ang) * v, Math.sin(c.ang) * v);
+      let score = 0;
+      if (r.goal === 2) score += 2000;
+      else if (r.goal === 1) score -= 2000;
+      score += (ballX0 - r.ballX) * 2; // l'IA attaque vers la gauche
+      let kills = 0, losses = 0;
+      for (let k = 0; k < 8; k++) {
+        const before = bodies[k].alive && !bodies[k].out;
+        const after = r.end[k].alive && !r.end[k].out;
+        if (before && !after) { if (k < 4) kills++; else losses++; }
+      }
+      score += kills * 160 - losses * 160;
+      if (r.ballX === W / 2 && r.ballY === H / 2 && ballX0 !== W / 2) score -= 60; // ballon sorti
+      score += Math.random() * 8;
+      if (!best || score > best.score) best = { idx: c.i, vx: Math.cos(c.ang) * v, vy: Math.sin(c.ang) * v, score };
+    }
+    if (step.pos < cands.length) { setTimeout(step, 0); return; } // lot suivant : l'UI respire
+    aiThinking = false;
+    if (deads.length && (!best || best.score < 20 || deads.length >= 2)) { applyRevive(deads[0]); return; }
+    if (best) applyFlick(best.idx, best.vx, best.vy);
+    else if (deads.length) applyRevive(deads[0]);
+    else endTurn(); // sécurité : aucun coup possible (bonus épuisés, jetons morts) → passer
+  };
+  step.pos = 0;
+  aiThinking = true;
+  setTimeout(step, 0);
 }
 function aiFreeShot() {
   if (mode !== "ai" || phase !== "benshot" || actPlayer !== 2) return;
@@ -2190,8 +2279,10 @@ function broadcastState() {
       t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady, terrain, trigOpts,
       dlIn: actionDeadline ? Math.max(0, actionDeadline - Date.now()) : 0,
       setupIn: (phase === "setup" && setupDeadline) ? Math.max(0, setupDeadline - Date.now()) : 0,
-      draftIn: (phase === "draft" && draftDeadline) ? Math.max(0, draftDeadline - Date.now()) : 0,
-      drafts: { 1: draftReady[1] ? drafts[1] : null, 2: draftReady[2] ? drafts[2] : null },
+      draftIn: (phase === "draft" && !snake && draftDeadline) ? Math.max(0, draftDeadline - Date.now()) : 0,
+      pickIn: (phase === "draft" && snake && pickDeadline) ? Math.max(0, pickDeadline - Date.now()) : 0,
+      snake: snake, snT: snakeTurn, snPool: snakePool, snFirst: firstPick,
+      drafts: snake ? { 1: drafts[1], 2: drafts[2] } : { 1: draftReady[1] ? drafts[1] : null, 2: draftReady[2] ? drafts[2] : null },
       draftReady, walls, bf: bonusFlicks,
       mizCands: (phase === "mizterio_pick") ? mizCands : [],
       viewers: vnames.length, vnames: vnames,
@@ -2218,10 +2309,12 @@ function onMsg(m) {
     else if (m.kind === "miz_swap" && m.idx !== undefined && phase === "mizterio_target") applyAct("miz_swap", { idx: m.idx });
     else if (m.kind === "miz_pass") applyAct("miz_pass", {});
   } else if (m.t === "draft_done" && mode === "host") {
-    if (phase === "draft" && !draftReady[2] && Array.isArray(m.chars) && m.chars.length === 4 && m.chars.every((c) => CHARS.indexOf(c) >= 0)) {
+    if (phase === "draft" && !snake && !draftReady[2] && Array.isArray(m.chars) && m.chars.length === 4 && m.chars.every((c) => CHARS.indexOf(c) >= 0)) {
       drafts[2] = m.chars.slice(); draftReady[2] = true;
       if (draftReady[1]) finishDraft(); else broadcastState();
     }
+  } else if (m.t === "draft_pick" && mode === "host") {
+    if (phase === "draft" && snake && snakeTurn === 2 && typeof m.char === "string") draftPick(2, m.char);
   } else if (m.t === "setup_done" && mode === "host") {
     if (phase === "setup" && Array.isArray(m.pos) && m.pos.length === 4) {
       for (let i = 0; i < 4; i++) {
@@ -2243,8 +2336,16 @@ function onMsg(m) {
     if (m.trigOpts) trigOpts = m.trigOpts;
     if (m.walls) walls = m.walls;
     if (m.bf) bonusFlicks = m.bf;
-    if (m.drafts) { if (m.drafts[1]) { drafts[1] = m.drafts[1]; draftReady[1] = true; } if (m.drafts[2]) { drafts[2] = m.drafts[2]; draftReady[2] = true; } }
-    draftDeadline = (m.phase === "draft" && m.draftIn) ? Date.now() + m.draftIn : (m.phase === "draft" ? draftDeadline : 0);
+    if (m.drafts) { if (m.drafts[1]) { drafts[1] = m.drafts[1]; if (snake || drafts[1].length >= 4) draftReady[1] = true; } if (m.drafts[2]) { drafts[2] = m.drafts[2]; if (snake || drafts[2].length >= 4) draftReady[2] = true; } }
+    if (m.snake !== undefined) snake = !!m.snake;
+    if (snake) {
+      snakeTurn = m.snT || 1;
+      snakePool = Array.isArray(m.snPool) ? m.snPool : CHARS.slice();
+      firstPick = m.snFirst || 1;
+      pickDeadline = (m.phase === "draft" && m.pickIn) ? Date.now() + m.pickIn : 0;
+      draftDeadline = 0;
+    }
+    draftDeadline = (m.phase === "draft" && !snake && m.draftIn) ? Date.now() + m.draftIn : (m.phase === "draft" ? draftDeadline : 0);
     if (m.mizCands) mizCands = m.mizCands;
     if (m.terrain && TERRAINS[m.terrain]) terrain = m.terrain;
     if (m.names) specNames = m.names;
@@ -2269,7 +2370,10 @@ function onMsg(m) {
     if (phase === "triggerchoice" && isActingPlayer() && prevPhase !== "triggerchoice") showTrigPanel();
     // v8 : draft, Cyrilou, Mizterio côté invité/spectateur
     if (phase === "draft") {
-      if (mode === "guest" && !draftReady[mySide] && prevPhase !== "draft") { draftSel = []; buildDraftUI(); }
+      if (snake) {
+        if (mode === "guest") buildDraftUI(); // rafraîchir à chaque pick reçu
+        else if (mode === "spectator") setStatus("🃏 Draft alterné — au tour de " + (snakeTurn === 1 ? "🔴 Rouge" : "🔵 Bleu") + " · 🔴 " + (drafts[1] || []).length + "/4 · 🔵 " + (drafts[2] || []).length + "/4");
+      } else if (mode === "guest" && !draftReady[mySide] && prevPhase !== "draft") { draftSel = []; buildDraftUI(); }
       if (mode === "spectator" && prevPhase !== "draft") setStatus("🃏 Draft en cours…");
     } else if (prevPhase === "draft") hide("draftPanel");
     if (phase === "cyrilou_choice" && isActingPlayer() && prevPhase !== "cyrilou_choice") show("cyrilouPanel");
@@ -2470,6 +2574,7 @@ function backMenu() {
   fx = [];
   walls = { 1: null, 2: null }; wallUsePos = { 1: null, 2: null }; wallAim = false;
   draftReady = { 1: false, 2: false }; draftSel = []; draftDeadline = 0;
+  snake = false; snakeTurn = 1; snakePool = []; pickDeadline = 0; firstPick = 1;
 }
 
 // ---------- Boutons ----------
@@ -2609,6 +2714,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="ccqQROifNAEOYrb4/SmJyA==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="7Z73G3pE6XqazY2qp3mLeg==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
