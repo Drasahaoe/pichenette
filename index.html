@@ -64,6 +64,12 @@
   .rules .ch { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
   .rules .ch img { width: 34px; height: 34px; border-radius: 50%; flex: 0 0 auto; border: 2px solid #4f7ab0; }
   .rules .ch span { flex: 1; }
+  #draftGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }
+  .dchar { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 4px; border: 2px solid #3b5170; border-radius: 10px; cursor: pointer; font-size: 12px; text-align: center; transition: transform .08s; }
+  .dchar:hover { transform: scale(1.05); border-color: #8ab4e8; }
+  .dchar.sel { border-color: #ffd166; background: rgba(255,209,102,.12); box-shadow: 0 0 8px rgba(255,209,102,.4); }
+  .dchar img { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #4f7ab0; }
+  .dph { width: 44px; height: 44px; border-radius: 50%; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 15px; border: 2px solid #4f7ab0; }
   .hidden { display: none !important; }
   .small { font-size: 12.5px; opacity: .7; margin-top: 6px; line-height: 1.5; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #ffd166; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; vertical-align: -2px; margin-right: 6px; }
@@ -124,12 +130,13 @@
 </div>
 <button id="setupBtn" class="btn" style="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);width:auto;padding:10px 24px;margin:0;z-index:5;display:none;background:#2f7a44;border-color:#4fae6b;">✅ Positions validées</button>
 <button id="reviveBtn" class="btn" style="position:fixed;bottom:16px;left:16px;width:auto;padding:10px 18px;margin:0;z-index:5;display:none;background:#7a5a20;border-color:#ffd166;">🩹 Ressusciter un jeton</button>
+<button id="btnWall" class="btn" style="position:fixed;bottom:16px;left:200px;width:auto;padding:10px 18px;margin:0;z-index:5;display:none;background:#3d2a5c;border-color:#8f6fd0;">🧱 Mur (Espace)</button>
 
 <!-- MENU -->
 <div class="overlay" id="menu">
   <div class="card">
     <h1>🏑 <span class="accent">Pichenette</span></h1>
-    <div class="sub">Duel de pichenettes tour par tour — classé, ami ou contre l'IA. <b>v7</b> <span style="opacity:.65">(si vous ne voyez pas « v7 » ici, faites Ctrl+F5 pour mettre à jour !)</span></div>
+    <div class="sub">Duel de pichenettes tour par tour — classé, ami ou contre l'IA. <b>v8</b> <span style="opacity:.65">(si vous ne voyez pas « v8 » ici, faites Ctrl+F5 pour mettre à jour !)</span></div>
     <button class="btn primary" id="btnLocal">👥 2 joueurs — même écran</button>
     <button class="btn" id="btnAI">🤖 Jouer contre l'IA</button>
     <button class="btn" id="btnRanked">🏆 Partie classée — queue & Elo</button>
@@ -145,11 +152,15 @@
     </div>
     <div class="rules">
       <b>But du jeu :</b> propulse le ballon dans le but adverse. Tu ne touches <b>jamais</b> le ballon directement — uniquement tes jetons (fronde : maintiens, tire en arrière, relâche). Premier à <b>5 points</b>. Le but est <b>plus petit que le ballon</b> : vise juste !<br/><b>Pas de bords :</b> ce qui sort du terrain est sorti — le ballon est remis au centre, un jeton éliminé se ressuscite à ton tour (collé à ton but, au prix de ton coup). <b>Exception : sur 🧊 Glace, des bordures renvoient tout dans le terrain — rien ne sort, tout rebondit.</b><br/>
-      <b>Personnages</b> (chaque joueur a les 4 mêmes) :
+      <b>Personnages</b> — <b>draft</b> : chaque joueur choisit <b>4 personnages parmi 8</b> avant la partie (les deux camps peuvent choisir les mêmes) :
       <div class="ch"><img id="miniDrasah" alt="Drasah"/><span><b>Drasah</b> — peut être joué deux fois de suite : le jouer offre une 2e pichenette immédiate (une fois, pas de chaîne).</span></div>
       <div class="ch"><img id="miniWun" alt="Wun"/><span><b>Wun</b> — retourne tout jeton adverse qu'il touche, <b>à tout moment</b> (jeton mort : ne se joue plus mais bloque). Ranimable uniquement par le contact d'un jeton allié. Deux Wun qui se touchent : celui du joueur qui attaque gagne.</span></div>
       <div class="ch"><img id="miniBenp" alt="BenP"/><span><b>BenP</b> — si le <b>ballon le touche</b> (même pendant le tour adverse), à la fin de la course du ballon son camp obtient un <b>tir gratuit</b> depuis la position du ballon.</span></div>
       <div class="ch"><img id="miniSynfo" alt="Synfo"/><span><b>Synfo</b> — si le <b>ballon la touche</b>, à la fin de la course : laisser le ballon OU <b>passe</b> : choisis l'allié puis <b>oriente librement le ballon autour de lui</b>. Combo : une passe à BenP déclenche son tir gratuit !</span></div>
+      <div class="ch"><img id="miniLeure" alt="Leureduthé"/><span><b>Leureduthé</b> — pendant sa course, chaque <b>allié touché</b> gagne une <b>pichenette bonus</b> immédiate (utilisable dans le même tour).</span></div>
+      <div class="ch"><img id="miniMerlin" alt="Merlinpinpin"/><span><b>Merlinpinpin</b> — inamovible : ni jeton adverse ni ballon ne peuvent le déplacer (ses alliés, si). <b>Barre ESPACE</b> : place ou déplace son <b>mur unique</b> (tout rebondit). Il doit avoir été déplacé depuis la dernière utilisation (par lui-même ou poussé par un allié).</span></div>
+      <div class="ch"><img id="miniCyrilou" alt="Cyriloulefilou"/><span><b>Cyriloulefilou</b> — comme BenP si le ballon le touche, mais au choix : <b>laisser</b> la balle suivre son chemin OU <b>shooter</b> : le ballon se colle à lui, tu l'orientes librement puis tires (puissance <b>×2</b>) — ce tir <b>ne peut pas marquer</b> et ne déclenche aucun effet.</span></div>
+      <div class="ch"><img id="miniMizterio" alt="Mizterio"/><span><b>Mizterio</b> — à la fin de sa course, il peut <b>échanger la place</b> de n'importe quel ennemi qu'il a touché avec n'importe quel autre jeton du plateau.</span></div>
     </div>
   </div>
 </div>
@@ -193,6 +204,36 @@
     <h2>🎯 Synfo a touché le ballon</h2>
     <button class="btn primary" id="btnSynfoStay">▶️ Laisser la trajectoire du ballon</button>
     <button class="btn" id="btnSynfoPass">🎯 Faire une passe (choisir un jeton)</button>
+  </div>
+</div>
+
+<!-- CYRILOU CHOICE -->
+<div class="overlay hidden" id="cyrilouPanel">
+  <div class="card">
+    <h2>🎪 Cyriloulefilou a touché le ballon</h2>
+    <button class="btn primary" id="btnCyrilouStay">▶️ Laisser la balle suivre son chemin</button>
+    <button class="btn" id="btnCyrilouShoot">💥 Shooter (ballon collé, orientation libre, tir ×2 — ne peut pas marquer, aucun effet)</button>
+  </div>
+</div>
+
+<!-- MIZTERIO PICK -->
+<div class="overlay hidden" id="mizPanel">
+  <div class="card">
+    <h2>🎭 Mizterio</h2>
+    <div class="sub">Choisis l'ennemi touché à échanger, ou passe.</div>
+    <div id="mizList"></div>
+    <button class="btn danger" id="btnMizPass">Passer</button>
+  </div>
+</div>
+
+<!-- DRAFT -->
+<div class="overlay hidden" id="draftPanel">
+  <div class="card">
+    <h2 id="draftTitle">🃏 Draft — choisis tes 4 personnages</h2>
+    <div class="sub">Choisis <b>4 personnages parmi 8</b> — les deux camps peuvent choisir les mêmes. Glisse-survole un nom pour voir son effet.</div>
+    <div id="draftGrid"></div>
+    <div class="sub" id="draftCount">0 / 4</div>
+    <button class="btn primary" id="btnDraftOk">✅ Valider mon équipe</button>
   </div>
 </div>
 
@@ -293,8 +334,8 @@ for (const k in AVATAR_DATA) {
   AVATARS[k] = im;
 }
 document.addEventListener("DOMContentLoaded", () => {
-  const mini = { miniDrasah: "drasah", miniWun: "wun", miniBenp: "benp", miniSynfo: "synfo" };
-  for (const id in mini) { const el = document.getElementById(id); if (el) el.src = AVATAR_DATA[mini[id]]; }
+  const mini = { miniDrasah: "drasah", miniWun: "wun", miniBenp: "benp", miniSynfo: "synfo", miniLeure: "leure", miniMerlin: "merlin", miniCyrilou: "cyrilou", miniMizterio: "mizterio" };
+  for (const id in mini) { const el = document.getElementById(id); if (el) { if (AVATAR_DATA[mini[id]]) el.src = AVATAR_DATA[mini[id]]; else { el.style.display = "none"; } } }
 });
 
 // ---------- Constantes ----------
@@ -312,8 +353,10 @@ function friction() { return TERRAINS[terrain].f; }
 function hasWalls() { return !!TERRAINS[terrain].wall; }
 const WALL_REST = 0.72, BODY_REST = 0.92, STOP_V = 0.06;
 const WIN_SCORE = 5;
-const CHARS = ["drasah", "wun", "benp", "synfo"];
-const CHAR_NAMES = { drasah: "Drasah", wun: "Wun", benp: "BenP", synfo: "Synfo" };
+const CHARS = ["drasah", "wun", "benp", "synfo", "leure", "merlin", "cyrilou", "mizterio"]; // roster v8
+const CHAR_NAMES = { drasah: "Drasah", wun: "Wun", benp: "BenP", synfo: "Synfo", leure: "Leureduthé", merlin: "Merlinpinpin", cyrilou: "Cyriloulefilou", mizterio: "Mizterio" };
+const CHAR_COLORS = { leure: "#d4a017", merlin: "#6b4fa0", cyrilou: "#1f8a70", mizterio: "#8a2be2" };
+const WALL_LEN = 135, WALL_TH = 12; // mur de Merlinpinpin : 2,5 jetons de long
 
 // ---------- Canvas ----------
 const cv = document.getElementById("cv");
@@ -345,7 +388,7 @@ let deferred = [];        // triggers de son propre camp différés derrière le
 let trigOpts = [];        // options du panneau de choix d'effet
 let inResolution = false; // pendant une résolution d'effet : tout nouveau trigger se résout immédiatement
 let chainCount = 0;       // sécurité : plafond d'effets enchaînés dans un tour
-let turnInfo = { flickedChar: null, bonusActive: false, counter: false };
+let turnInfo = { flickedChar: null, counter: false, baseUsed: false, drasahExtra: false, drasahGiven: false };
 let setupReady = { 1: false, 2: false };
 const savedSetup = { 1: null, 2: null };
 let simActive = false, simGoal = null;
@@ -360,12 +403,29 @@ let viewers = {};          // pseudo -> dernier signalement (côté hôte)
 let specTmr = null, specName = "Spectateur";
 let chatOpen = false, chatUnread = 0;
 let fx = [];               // particules locales (cosmétique uniquement, jamais diffusées)
+// v8 : draft, nouveaux persos
+let draftReady = { 1: false, 2: false };      // chaque camp a validé sa sélection
+let drafts = { 1: null, 2: null };            // chars choisis par camp : ["drasah",...]
+let draftDeadline = 0;                        // timer de draft (45 s)
+let draftSel = [];                            // sélection en cours dans le panneau
+let bonusFlicks = {};                         // idx jeton -> pichenettes bonus restantes (Leureduthé)
+let leureTouched = [];                        // alliés touchés par Leureduthé pendant la course
+let miztouched = [];                          // ennemis ayant touché un Mizterio pendant la course
+let mizCands = [];                            // ennemis touchés en attente de choix (phase mizterio_pick)
+let mizEnemy = -1;                            // ennemi choisi, en attente de cible (phase mizterio_target)
+let cyrilouShot = false;                      // tir ×2 de Cyrilou en vol : buts solides, aucun trigger
+let walls = { 1: null, 2: null };             // mur de Merlinpinpin par camp {x1,y1,x2,y2}
+let wallUsePos = { 1: null, 2: null };        // position du Merlin au moment de l'utilisation du mur
+let wallAim = false;                          // mode placement de mur (barre espace)
+let turnFlicks = 0;                           // compteur de pichenettes du tour (garde-fou anti-boucle)
 
-function makeBodies() {
+function makeBodies(d1, d2) {
+  const c1 = (Array.isArray(d1) && d1.length === 4) ? d1 : ["drasah", "wun", "benp", "synfo"];
+  const c2 = (Array.isArray(d2) && d2.length === 4) ? d2 : ["drasah", "wun", "benp", "synfo"];
   const arr = [];
   const ys = [H/2 - 165, H/2 - 55, H/2 + 55, H/2 + 165];
-  for (let i = 0; i < 4; i++) arr.push(body(150, ys[i], TOKEN_R, 3, "token", 1, CHARS[i]));
-  for (let i = 0; i < 4; i++) arr.push(body(W - 150, ys[i], TOKEN_R, 3, "token", 2, CHARS[i]));
+  for (let i = 0; i < 4; i++) arr.push(body(150, ys[i], TOKEN_R, 3, "token", 1, c1[i]));
+  for (let i = 0; i < 4; i++) arr.push(body(W - 150, ys[i], TOKEN_R, 3, "token", 2, c2[i]));
   arr.push(body(W / 2, H / 2, BALL_R, 1, "ball", 0, null));
   return arr;
 }
@@ -373,7 +433,7 @@ function body(x, y, r, m, type, owner, char) {
   return { x, y, vx: 0, vy: 0, r, m, type, owner, char, alive: true, out: false };
 }
 function resetPositions() {
-  bodies = makeBodies();
+  bodies = makeBodies(drafts[1], drafts[2]);
   for (const side of [1, 2]) {
     const pos = savedSetup[side];
     if (!pos) continue;
@@ -383,7 +443,12 @@ function resetPositions() {
     }
   }
 }
-function freshTurnInfo() { turnInfo = { flickedChar: null, bonusActive: false, counter: false }; pendIdx = -1; pendArmer = 0; deferred = []; trigOpts = []; inResolution = false; chainCount = 0; }
+function freshTurnInfo() {
+  turnInfo = { flickedChar: null, counter: false, baseUsed: false, drasahExtra: false, drasahGiven: false };
+  pendIdx = -1; pendArmer = 0; deferred = []; trigOpts = []; inResolution = false; chainCount = 0;
+  bonusFlicks = {}; leureTouched = []; miztouched = []; mizCands = []; mizEnemy = -1;
+  cyrilouShot = false; turnFlicks = 0;
+}
 
 // ---------- UI ----------
 const $ = (id) => document.getElementById(id);
@@ -399,8 +464,11 @@ function updateBar(bonus) {
   const pill = $("turnPill");
   const name = turn === 1 ? "Rouge" : "Bleu";
   if (phase === "setup") pill.textContent = "Placement des jetons…";
+  else if (phase === "draft") pill.textContent = "🃏 Draft…";
   else if (phase === "moving") pill.textContent = "Pièces en mouvement…";
   else if (phase === "triggerchoice") pill.textContent = "Choix de l'effet : " + name;
+  else if (phase === "cyrilou_choice" || phase === "cyrilou_orient" || phase === "cyrilou_shot") pill.textContent = "🎪 Cyrilou : " + (actPlayer === 1 ? "Rouge" : "Bleu");
+  else if (phase === "mizterio_pick" || phase === "mizterio_target") pill.textContent = "🎭 Mizterio : " + (actPlayer === 1 ? "Rouge" : "Bleu");
   else if (turnInfo.counter && (phase === "benshot" || phase === "synfo_choice" || phase === "synfo_pick" || phase === "synfo_orient")) pill.textContent = "⚡ Contre-jeu : " + (actPlayer === 1 ? "Rouge" : "Bleu");
   else pill.textContent = "Tour : " + name + (bonus ? " (rejoue !)" : "");
   pill.className = "pill " + (phase === "setup" ? "" : (turn === 1 ? "red" : "blue")) + (bonus ? " bonus" : "");
@@ -416,6 +484,15 @@ function canPlaySide(owner) {
   if (phase !== "aim") return false;
   if (mode === "local") return owner === turn;
   return owner === mySide && owner === turn;
+}
+// v8 : un jeton est jouable si le coup de base est dispo, OU bonus Drasah (n'importe quel jeton), OU bonus Leureduthé (ce jeton précisément)
+function canFlick(idx) {
+  const b = bodies[idx];
+  if (!b || b.type !== "token" || !b.alive || b.out) return false;
+  if (phase !== "aim") return false;
+  const mine = mode === "local" ? b.owner === turn : (b.owner === mySide && b.owner === turn);
+  if (!mine) return false;
+  return !turnInfo.baseUsed || turnInfo.drasahExtra || (bonusFlicks[idx] || 0) > 0;
 }
 function isActingPlayer() {
   if (mode === "local") return true;
@@ -446,6 +523,7 @@ function stepPhysics() {
     }
     collideGoals();
     collideBodies();
+    collideMurs();
     collideWalls();
     checkExits();
     if (checkGoal()) return;
@@ -467,11 +545,12 @@ function collideWalls() {
     else if (b.y > H - M - b.r) { b.y = H - M - b.r; if (b.vy > 0) { sndBounce(b); b.vy = -b.vy * WALL_REST; } }
   }
 }
-// Le but est solide et fixe : les jetons rebondissent dessus.
+// But solide et fixe : les jetons rebondissent dessus. (Tir Cyrilou ×2 : le ballon rebondit aussi — pas de but.)
 function collideGoals() {
   for (const g of [GOAL_L, GOAL_RR]) {
     for (const b of bodies) {
-      if (b.type === "ball" || b.out) continue; // ballon : but dès le contact
+      if (b.out) continue;
+      if (b.type === "ball" && !cyrilouShot) continue; // ballon : but dès le contact (sauf tir Cyrilou : solide)
       const dx = b.x - g.x, dy = b.y - g.y;
       const d = Math.hypot(dx, dy), min = b.r + GOAL_R;
       if (d === 0 || d >= min) continue;
@@ -496,17 +575,58 @@ function collideBodies() {
       const d = Math.hypot(dx, dy), min = a.r + b.r;
       if (d === 0 || d >= min) continue;
       const nx = dx / d, ny = dy / d;
-      const overlap = min - d, tot = a.m + b.m;
-      a.x -= nx * overlap * (b.m / tot); a.y -= ny * overlap * (b.m / tot);
-      b.x += nx * overlap * (a.m / tot); b.y += ny * overlap * (a.m / tot);
+      const overlap = min - d;
       const dvn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
-      if (dvn < 0) {
-        const imp = -(1 + BODY_REST) * dvn / (1 / a.m + 1 / b.m);
-        a.vx -= imp / a.m * nx; a.vy -= imp / a.m * ny;
-        b.vx += imp / b.m * nx; b.vy += imp / b.m * ny;
+      // Merlinpinpin : immobile face au ballon et aux jetons adverses (rebond), mobile pour ses alliés
+      const aM = isMerlin(a), bM = isMerlin(b);
+      if (aM && bM) { // deux Merlin adverses : ni l'un ni l'autre ne cède
+        a.x -= nx * overlap / 2; a.y -= ny * overlap / 2;
+        b.x += nx * overlap / 2; b.y += ny * overlap / 2;
+      } else if (aM && (b.type === "ball" || b.owner !== a.owner)) {
+        staticBounce(b, nx, ny, overlap);
+      } else if (bM && (a.type === "ball" || a.owner !== b.owner)) {
+        staticBounce(a, -nx, -ny, overlap);
+      } else {
+        const tot = a.m + b.m;
+        a.x -= nx * overlap * (b.m / tot); a.y -= ny * overlap * (b.m / tot);
+        b.x += nx * overlap * (a.m / tot); b.y += ny * overlap * (a.m / tot);
+        if (dvn < 0) {
+          const imp = -(1 + BODY_REST) * dvn / (1 / a.m + 1 / b.m);
+          a.vx -= imp / a.m * nx; a.vy -= imp / a.m * ny;
+          b.vx += imp / b.m * nx; b.vy += imp / b.m * ny;
+        }
       }
       handleContact(a, b);
       if (dvn < -1.5) sndHit(-dvn);
+    }
+  }
+}
+// Merlinpinpin tient bon : le mobile est renvoyé, lui ne bouge pas d'un pixel.
+function isMerlin(t) { return t.type === "token" && t.char === "merlin" && t.alive && !t.out; }
+function staticBounce(mov, nx, ny, overlap) {
+  mov.x += nx * overlap; mov.y += ny * overlap;
+  const vn = mov.vx * nx + mov.vy * ny;
+  if (vn < 0) { mov.vx -= (1 + BODY_REST) * vn * nx; mov.vy -= (1 + BODY_REST) * vn * ny; }
+}
+// Mur de Merlinpinpin : segment solide, tout rebondit.
+function collideMurs() {
+  for (const side of [1, 2]) {
+    const w = walls[side];
+    if (!w) continue;
+    const ax = w.x2 - w.x1, ay = w.y2 - w.y1;
+    const len2 = ax * ax + ay * ay || 1;
+    for (const b of bodies) {
+      if (b.out) continue;
+      let t = ((b.x - w.x1) * ax + (b.y - w.y1) * ay) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const px = w.x1 + ax * t, py = w.y1 + ay * t;
+      const dx = b.x - px, dy = b.y - py;
+      const d = Math.hypot(dx, dy), minD = b.r + WALL_TH / 2;
+      if (d === 0 || d >= minD) continue;
+      const nx = dx / (d || 1), ny = dy / (d || 1);
+      b.x = px + nx * minD; b.y = py + ny * minD;
+      const vn = b.vx * nx + b.vy * ny;
+      if (vn < 0) { b.vx -= (1 + WALL_REST) * vn * nx; b.vy -= (1 + WALL_REST) * vn * ny; sndBounce(b); }
     }
   }
 }
@@ -524,14 +644,24 @@ function handleContact(a, b) {
       killToken(loser);
     } else if (aW && b.owner !== a.owner && b.alive && !b.out) killToken(b);
     else if (bW && a.owner !== b.owner && a.alive && !a.out) killToken(a);
+    if (!simActive) {
+      const ia = bodies.indexOf(a), ib = bodies.indexOf(b);
+      // Leureduthé : alliés touchés pendant la course → +1 pichenette chacun à la résolution
+      if (a.char === "leure" && a.alive && !a.out && b.owner === a.owner && b.alive && !b.out) addOnce(leureTouched, ib);
+      if (b.char === "leure" && b.alive && !b.out && a.owner === b.owner && a.alive && !a.out) addOnce(leureTouched, ia);
+      // Mizterio : ennemis l'ayant touché (ou touchés par lui), dans les deux sens — {e: idx ennemi, o: owner du Mizterio}
+      if (a.char === "mizterio" && a.alive && !a.out && b.owner !== a.owner && b.alive && !b.out) addOnce(miztouched, { e: ib, o: a.owner });
+      if (b.char === "mizterio" && b.alive && !b.out && a.owner !== b.owner && a.alive && !a.out) addOnce(miztouched, { e: ia, o: b.owner });
+    }
   }
   if (a.type === "ball" || b.type === "ball") {
     const tok = a.type === "ball" ? b : a;
     if (tok.type !== "token" || tok.out || !tok.alive) return;
-    if (simActive) return; // l'IA évalue sans déclencher les triggers
-    if ((tok.char === "benp" || tok.char === "synfo") && chainCount < 12) pendIdx = bodies.indexOf(tok); // une seule fente par course : la DERNIÈRE touche gagne
+    if (simActive || cyrilouShot) return; // le tir ×2 de Cyrilou ne déclenche aucune capacité (IA évalue sans triggers non plus)
+    if ((tok.char === "benp" || tok.char === "synfo" || tok.char === "cyrilou") && chainCount < 12) pendIdx = bodies.indexOf(tok); // une seule fente par course : la DERNIÈRE touche gagne
   }
 }
+function addOnce(arr, v) { if (arr.indexOf(v) < 0) arr.push(v); }
 function killToken(b) {
   if (!b.alive || b.out) return;
   b.alive = false;
@@ -556,8 +686,9 @@ function checkExits() {
     }
   }
 }
-// Dès qu'il y a contact ballon-but : but.
+// Dès qu'il y a contact ballon-but : but. (Sauf pendant le tir ×2 de Cyrilou : les buts le renvoient.)
 function checkGoal() {
+  if (cyrilouShot) return false;
   const ball = bodies[8];
   const dd = BALL_R + GOAL_R;
   if (Math.hypot(ball.x - GOAL_L.x, ball.y - GOAL_L.y) < dd) { if (simActive) { simGoal = 2; return true; } onGoal(2); return true; }
@@ -576,7 +707,7 @@ function onGoal(scorer) {
 }
 // ---------- Résolution des triggers ----------
 // Un trigger n'est valable que si son jeton est vivant et sur le terrain au moment de la résolution.
-function trigValid(i) { const t = bodies[i]; return i >= 0 && t && t.type === "token" && t.alive && !t.out && (t.char === "benp" || t.char === "synfo"); }
+function trigValid(i) { const t = bodies[i]; return i >= 0 && t && t.type === "token" && t.alive && !t.out && (t.char === "benp" || t.char === "synfo" || t.char === "cyrilou"); }
 function hasPlayable(side) { for (let i = 0; i < 8; i++) { const b = bodies[i]; if (b.owner === side && b.alive && !b.out) return true; } return false; }
 // Fin de trajectoire : contre-jeu prioritaire, sinon triggers du camp après ses coups, sinon fin de tour.
 function processPend() {
@@ -585,8 +716,7 @@ function processPend() {
   if (cur >= 0 && trigValid(cur)) {
     const tok = bodies[cur];
     if (tok.owner !== pendArmer) { startTrigger(cur, true); return; } // CONTRE JEU : résolution immédiate, prioritaire
-    if (!inResolution && turnInfo.flickedChar === "drasah" && !turnInfo.bonusActive) { deferred.push(cur); endTurn(); return; } // différé derrière la 2e pichenette
-    deferred.push(cur); // plus de coups à jouer : résolution après le tour (via endTurn)
+    deferred.push(cur); // résolu par endTurn — derrière le bonus Drasah / les pichenettes bonus
   }
   endTurn();
 }
@@ -607,6 +737,13 @@ function startTrigger(i, isCounter) {
     flash(isCounter ? "⚡ CONTRE JEU — BenP " + team + " : tir gratuit !" : "🔵 BenP " + team + " : tir gratuit au ballon, depuis sa position !");
     updateBar(); broadcastState();
     if (mode === "ai" && actPlayer === 2) setTimeout(aiFreeShot, 600);
+  } else if (tok.char === "cyrilou") {
+    phase = "cyrilou_choice";
+    armTimer(30000);
+    flash(isCounter ? "⚡ CONTRE JEU — Cyrilou " + team + " : à lui de choisir !" : "💨 Cyrilou " + team + " a touché le ballon — laisser ou tirer (×2, sans but) ?");
+    if (isActingPlayer()) show("cyrilouPanel");
+    updateBar(); broadcastState();
+    if (mode === "ai" && actPlayer === 2) setTimeout(aiCyrilou, 700);
   } else {
     phase = "synfo_choice";
     flash(isCounter ? "⚡ CONTRE JEU — Synfo " + team + " : à elle de choisir !" : "🟣 Synfo " + team + " a touché le ballon — choix à la fin de sa course.");
@@ -651,16 +788,32 @@ function trigChoose(i) {
 function aiTrigChoice() {
   if (mode !== "ai" || phase !== "triggerchoice" || actPlayer !== 2) return;
   let pick = trigOpts.find((i) => bodies[i] && bodies[i].char === "benp");
+  if (pick === undefined) pick = trigOpts.find((i) => bodies[i] && bodies[i].char === "cyrilou");
   if (pick === undefined) pick = trigOpts[0];
   applyAct("trig_choice", { idx: pick });
 }
 function endTurn() {
-  hide("synfoPanel"); hide("trigPanel");
-  if (turnInfo.flickedChar === "drasah" && !turnInfo.bonusActive) {
-    turnInfo.bonusActive = true;
+  hide("synfoPanel"); hide("trigPanel"); hide("cyrilouPanel"); hide("mizPanel");
+  // Mizterio en attente : il agit avant toute fin de tour (contre-jeu inclus)
+  if (resolveMizterio()) return;
+  // Leureduthé : chaque allié touché pendant la course gagne +1 pichenette
+  for (const i of leureTouched) {
+    const b = bodies[i];
+    if (b && b.type === "token" && b.alive && !b.out && turnFlicks < 12) {
+      bonusFlicks[i] = (bonusFlicks[i] || 0) + 1;
+      burst(b.x, b.y, ["#d4a017", "#ffd166", "#fff"], 14, 3);
+    }
+  }
+  leureTouched = [];
+  if (turnInfo.drasahExtra) {
+    turnInfo.drasahExtra = false;
     phase = "aim"; actPlayer = turn;
     armTimer(30000);
     flash("🎁 Drasah : rejoue une 2e pichenette !");
+  } else if (Object.keys(bonusFlicks).some((k) => bonusFlicks[k] > 0)) {
+    phase = "aim"; actPlayer = turn;
+    armTimer(30000);
+    flash("🎁 Leureduthé : pichenette bonus sur les jetons cerclés d'or !");
   } else if (deferred.length) {
     const cands = deferred.filter(trigValid);
     deferred = [];
@@ -681,22 +834,34 @@ function endTurn() {
       return;
     }
   }
-  updateBar(turnInfo.bonusActive); broadcastState();
+  updateBar(bonusPending()); broadcastState();
   scheduleAI();
+}
+function bonusPending() {
+  return !!(turnInfo && (turnInfo.drasahExtra || Object.keys(bonusFlicks).some((k) => bonusFlicks[k] > 0)));
 }
 function applyFlick(idx, vx, vy) {
   const b = bodies[idx];
   if (!b || b.type !== "token" || !b.alive || b.out) return;
+  // quelle ressource ce coup consomme-t-il ?
+  if (!turnInfo.baseUsed) turnInfo.baseUsed = true;
+  else if (turnInfo.drasahExtra) turnInfo.drasahExtra = false;
+  else if ((bonusFlicks[idx] || 0) > 0) bonusFlicks[idx]--;
+  else return; // aucune pichenette disponible (sécurité)
+  turnFlicks++;
+  if (turnFlicks > 12) { endTurn(); return; } // garde-fou anti-boucle (Leureduthé miroir)
+  if (b.char === "drasah" && !turnInfo.drasahGiven) { turnInfo.drasahExtra = true; turnInfo.drasahGiven = true; } // une fois par tour, pas de chaîne
   b.vx = vx; b.vy = vy;
   turnInfo.flickedChar = b.char;
   pendIdx = -1; pendArmer = turn; inResolution = false;
+  leureTouched = []; miztouched = []; // nouvelle course : suivi repart à zéro
   actPlayer = turn;
   phase = "moving";
   armTimer(0);
   burst(b.x, b.y, ["#ffffff", "#ffd166"], 7, 2.5);
   sndFlick();
   setStatus("💨 Pichenette de " + CHAR_NAMES[b.char] + " !");
-  updateBar(turnInfo.bonusActive); broadcastState();
+  updateBar(bonusPending()); broadcastState();
 }
 // Action d'un choix — exécutée par l'autorité.
 function applyAct(kind, d) {
@@ -721,8 +886,8 @@ function applyAct(kind, d) {
     ball.x = Math.max(ball.r, Math.min(W - ball.r, ball.x));
     ball.y = Math.max(ball.r, Math.min(H - ball.r, ball.y));
     setStatus("🎯 Passe de Synfo à " + CHAR_NAMES[tgt.char] + " !");
-    // COMBO : ballon collé à BenP → tir gratuit immédiat (chaîne autorisée)
-    if (tgt.char === "benp" && chainCount < 12) {
+    // COMBO : ballon collé à BenP ou Cyrilou → effet immédiat (chaîne autorisée)
+    if ((tgt.char === "benp" || tgt.char === "cyrilou") && chainCount < 12) {
       pendIdx = passTarget; pendArmer = actPlayer;
       passTarget = -1;
       processPend();
@@ -732,13 +897,67 @@ function applyAct(kind, d) {
     pendIdx = -1;
     phase = "aim";
     endTurn();
+  } else if (kind === "cyrilou_stay" && phase === "cyrilou_choice") {
+    setStatus("▶️ Cyrilou laisse le ballon suivre sa course.");
+    processPend();
+  } else if (kind === "cyrilou_shoot" && phase === "cyrilou_choice") {
+    // le ballon vient se coller à Cyrilou : orientation libre autour de lui
+    const cy = trigCyrilouIdx();
+    if (cy < 0 || !bodies[cy] || bodies[cy].out || !bodies[cy].alive) { endTurn(); return; }
+    passTarget = cy;
+    const dx = ball.x - bodies[cy].x, dy = ball.y - bodies[cy].y, dd = Math.hypot(dx, dy) || 1;
+    const R = bodies[cy].r + ball.r + 2;
+    ball.vx = 0; ball.vy = 0;
+    ball.x = bodies[cy].x + dx / dd * R; ball.y = bodies[cy].y + dy / dd * R;
+    phase = "cyrilou_orient";
+    armTimer(30000);
+    setStatus("💨 Oriente le ballon autour de Cyrilou puis relâche pour viser.");
+    if (mode === "ai" && actPlayer === 2) setTimeout(aiCyrilouOrient, 600);
+  } else if (kind === "cyrilou_place" && phase === "cyrilou_orient") {
+    const tgt = bodies[passTarget];
+    if (!tgt || tgt.out || !tgt.alive) { passTarget = -1; endTurn(); return; }
+    const dx = d.x - tgt.x, dy = d.y - tgt.y, dd = Math.hypot(dx, dy) || 1;
+    const R = tgt.r + ball.r + 2;
+    ball.vx = 0; ball.vy = 0;
+    ball.x = tgt.x + dx / dd * R;
+    ball.y = tgt.y + dy / dd * R;
+    phase = "cyrilou_shot";
+    armTimer(30000);
+    setStatus("💨 Tire en arrière sur le ballon : puissance ×2, pas de but possible !");
+    if (mode === "ai" && actPlayer === 2) setTimeout(aiCyrilouShot, 600);
+  } else if (kind === "cyrilou_shot" && phase === "cyrilou_shot") {
+    ball.vx = d.vx; ball.vy = d.vy;
+    cyrilouShot = true;
+    pendIdx = -1; pendArmer = actPlayer; inResolution = false;
+    passTarget = -1;
+    phase = "moving";
+    armTimer(0);
+    burst(ball.x, ball.y, ["#1f8a70", "#ffd166"], 12, 3.5);
+    sndFlick();
+    setStatus("💨 Cyrilou tire ×2 — aucun but, aucune capacité déclenchée !");
+  } else if (kind === "miz_pick" && phase === "mizterio_pick") {
+    if (mizCands.indexOf(d.idx) < 0) return;
+    mizEnemy = d.idx;
+    phase = "mizterio_target";
+    armTimer(30000);
+    setStatus("🎯 Clique sur le jeton à échanger avec " + CHAR_NAMES[bodies[d.idx].char] + " (mort autorisé, sorti exclu).");
+    if (mode === "ai" && actPlayer === 2) setTimeout(aiMizTarget, 600);
+  } else if (kind === "miz_swap" && phase === "mizterio_target") {
+    applyMizSwap(mizEnemy, d.idx);
+    return;
+  } else if (kind === "miz_pass" && phase === "mizterio_pick") {
+    mizCands = []; mizEnemy = -1; inResolution = false;
+    setStatus("▶️ Mizterio laisse tomber l'échange.");
+    endTurn();
+    return;
   } else if (kind === "trig_choice" && phase === "triggerchoice") {
     if (!Array.isArray(trigOpts) || trigOpts.indexOf(d.idx) < 0) return;
     trigOpts = [];
     startTrigger(d.idx, false);
   }
-  updateBar(turnInfo.bonusActive); broadcastState();
+  updateBar(bonusPending()); broadcastState();
 }
+function trigCyrilouIdx() { for (let i = 0; i < 8; i++) { const b = bodies[i]; if (b && b.char === "cyrilou" && b.alive && !b.out && b.owner === actPlayer) return i; } return -1; }
 function showSynfoPanel() { show("synfoPanel"); }
 // Passe de Synfo, étape orientation : le ballon se règle autour de l'allié choisi.
 function startSynfoOrient(idx) {
@@ -755,6 +974,239 @@ function startSynfoOrient(idx) {
   setStatus("🎯 Oriente le ballon autour de " + CHAR_NAMES[tgt.char] + " (glisse-le sur le cercle) puis relâche.");
   updateBar(); broadcastState();
   if (mode === "ai" && actPlayer === 2) setTimeout(aiSynfoOrient, 600);
+}
+// ---------- v8 : Cyriloulefilou ----------
+function cyrilouChoose(wantShoot) {
+  hide("cyrilouPanel");
+  if (mode === "guest") {
+    if (!wantShoot) sendMsg({ t: "act", kind: "cyrilou_stay" });
+    else sendMsg({ t: "act", kind: "cyrilou_shoot" });
+    return;
+  }
+  if (wantShoot) applyAct("cyrilou_shoot", {});
+  else applyAct("cyrilou_stay", {});
+}
+// ---------- v8 : Mizterio ----------
+// Intercepte endTurn tant qu'un échange est en attente. Renvoie true si la phase mizterio est lancée.
+function resolveMizterio() {
+  if (phase === "mizterio_pick" || phase === "mizterio_target") return true;
+  if (!miztouched.length) return false;
+  const o = miztouched[0].o;
+  const cands = [], rest = [];
+  for (const m of miztouched) { if (m.o === o) cands.push(m.e); else rest.push(m); }
+  miztouched = rest;
+  const valid = cands.filter((i) => bodies[i] && bodies[i].type === "token" && bodies[i].alive && !bodies[i].out);
+  if (!valid.length) return false;
+  mizCands = valid;
+  chainCount++;
+  actPlayer = o;
+  turnInfo.counter = o !== turn;
+  inResolution = true;
+  phase = "mizterio_pick";
+  armTimer(30000);
+  flash((turnInfo.counter ? "⚡ CONTRE JEU — " : "🔀 ") + "Mizterio " + (o === 1 ? "Rouge" : "Bleu") + " : choisis l'ennemi à échanger (ou passe).");
+  sndTrig();
+  if (isActingPlayer()) showMizPanel();
+  updateBar(); broadcastState();
+  if (mode === "ai" && actPlayer === 2) setTimeout(aiMizterio, 700);
+  return true;
+}
+function showMizPanel() {
+  const list = $("mizList");
+  list.innerHTML = "";
+  for (const i of mizCands) {
+    const b = bodies[i];
+    if (!b) continue;
+    const btn = document.createElement("button");
+    btn.className = "btn primary";
+    btn.innerHTML = "🔀 Échanger <b>" + CHAR_NAMES[b.char] + "</b> (" + (b.owner === 1 ? "Rouge" : "Bleu") + ")";
+    btn.onclick = () => mizPick(i);
+    list.appendChild(btn);
+  }
+  show("mizPanel");
+}
+function mizPick(i) {
+  hide("mizPanel");
+  if (mode === "guest") {
+    sendMsg({ t: "act", kind: "miz_pick", idx: i });
+    mizEnemy = i; phase = "mizterio_target"; armTimer(30000);
+    setStatus("🎯 Clique sur le jeton à échanger avec " + CHAR_NAMES[bodies[i].char] + " (mort autorisé, sorti exclu).");
+    return;
+  }
+  mizEnemy = i; phase = "mizterio_target"; armTimer(30000);
+  setStatus("🎯 Clique sur le jeton à échanger avec " + CHAR_NAMES[bodies[i].char] + " (mort autorisé, sorti exclu).");
+  broadcastState();
+}
+function mizPass() {
+  hide("mizPanel");
+  mizCands = []; mizEnemy = -1; inResolution = false;
+  phase = "aim"; // quitter mizterio_* AVANT endTurn (sinon resolveMizterio intercepte à l'infini)
+  if (mode === "guest") { sendMsg({ t: "act", kind: "miz_pass" }); return; }
+  endTurn();
+}
+function applyMizSwap(e, t) {
+  const be = bodies[e], bt = bodies[t];
+  if (be && bt && be.type === "token" && bt.type === "token" && !be.out && !bt.out && e !== t) {
+    const x = be.x, y = be.y;
+    be.x = bt.x; be.y = bt.y; bt.x = x; bt.y = y;
+    be.vx = be.vy = bt.vx = bt.vy = 0;
+    burst(be.x, be.y, ["#8a2be2", "#fff", "#ffd166"], 22, 4);
+    burst(bt.x, bt.y, ["#8a2be2", "#fff", "#ffd166"], 22, 4);
+    flash("🔀 " + CHAR_NAMES[be.char] + " et " + CHAR_NAMES[bt.char] + " échangés !");
+  }
+  mizCands = []; mizEnemy = -1; inResolution = false;
+  phase = "aim"; // quitter mizterio_* AVANT endTurn (sinon resolveMizterio intercepte à l'infini)
+  hide("mizPanel");
+  endTurn();
+}
+// ---------- v8 : mur de Merlinpinpin ----------
+function merlinIdx(side) { for (let i = 0; i < 8; i++) { const b = bodies[i]; if (b && b.char === "merlin" && b.owner === side) return i; } return -1; }
+function wallArmed(side) {
+  const i = merlinIdx(side);
+  if (i < 0) return false;
+  const b = bodies[i];
+  if (!b.alive || b.out) return false;
+  const p = wallUsePos[side];
+  return !p || Math.hypot(b.x - p.x, b.y - p.y) > 2;
+}
+function placeWall(side, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const half = Math.min(len, WALL_LEN) / 2;
+  const ux = dx / len, uy = dy / len;
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  const w = {
+    x1: Math.max(14, Math.min(W - 14, mx - ux * half)),
+    y1: Math.max(14, Math.min(H - 14, my - uy * half)),
+    x2: Math.max(14, Math.min(W - 14, mx + ux * half)),
+    y2: Math.max(14, Math.min(H - 14, my + uy * half))
+  };
+  walls[side] = w;
+  const mi = merlinIdx(side);
+  if (mi >= 0) wallUsePos[side] = { x: bodies[mi].x, y: bodies[mi].y };
+  wallAim = false;
+  burst(mx, my, [side === 1 ? "#ff6b6b" : "#5b9bd4", "#6b4fa0", "#fff"], 24, 4);
+  sndTrig();
+  flash("🧱 Mur de Merlinpinpin " + (side === 1 ? "Rouge" : "Bleu") + " placé !");
+  updateBar(); broadcastState();
+}
+// ---------- v8 : draft ----------
+function randomDraft() {
+  const pool = CHARS.slice();
+  const picks = [];
+  while (picks.length < 4 && pool.length) picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  while (picks.length < 4) picks.push(CHARS[picks.length]);
+  return picks;
+}
+function startDraft() {
+  phase = "draft";
+  draftReady = { 1: false, 2: false };
+  drafts = { 1: null, 2: null };
+  draftSel = [];
+  draftDeadline = Date.now() + 45000;
+  armTimer(0);
+  drag = null; wallAim = false;
+  walls = { 1: null, 2: null }; wallUsePos = { 1: null, 2: null };
+  scores = [0, 0]; turn = 1; actPlayer = 1;
+  freshTurnInfo();
+  hide("synfoPanel"); hide("trigPanel"); hide("revivePanel"); hide("winOverlay"); hide("cyrilouPanel"); hide("mizPanel");
+  buildDraftUI();
+  updateBar(); broadcastState();
+}
+function draftActorSide() {
+  // qui pick : en local, rouge puis bleu ; en réseau, chacun pick de son côté
+  if (mode === "local") return draftReady[1] ? 2 : 1;
+  return mySide;
+}
+function buildDraftUI() {
+  const grid = $("draftGrid");
+  grid.innerHTML = "";
+  for (const c of CHARS) {
+    const item = document.createElement("div");
+    item.className = "dchar" + (draftSel.indexOf(c) >= 0 ? " sel" : "");
+    if (AVATAR_DATA[c]) {
+      const img = document.createElement("img");
+      img.src = AVATAR_DATA[c];
+      item.appendChild(img);
+    } else {
+      const ph = document.createElement("div");
+      ph.className = "dph";
+      ph.style.background = CHAR_COLORS[c] || "#556";
+      ph.textContent = CHAR_NAMES[c].slice(0, 2).toUpperCase();
+      item.appendChild(ph);
+    }
+    const nm = document.createElement("span");
+    nm.textContent = CHAR_NAMES[c];
+    nm.title = CHAR_INFO[c] || "";
+    item.appendChild(nm);
+    item.onclick = () => {
+      if (mode !== "local" && mode !== "ai" && draftReady[mySide]) return;
+      const k = draftSel.indexOf(c);
+      if (k >= 0) draftSel.splice(k, 1);
+      else { if (draftSel.length >= 4) return; draftSel.push(c); }
+      sndUi();
+      buildDraftUI();
+    };
+    grid.appendChild(item);
+  }
+  $("draftCount").textContent = draftSel.length + " / 4";
+  $("btnDraftOk").disabled = draftSel.length !== 4;
+  const side = draftActorSide();
+  $("draftTitle").textContent = "Choisis 4 personnages — " + (mode === "local" ? (side === 1 ? "JOUEUR 🔴 Rouge" : "JOUEUR 🔵 Bleu") : (side === 1 ? "Rouge 🔴" : "Bleu 🔵"));
+  if (mode === "host" && draftReady[1]) $("draftTitle").textContent = "✅ Sélection validée — en attente de l'adversaire…";
+  if (mode === "guest" && draftReady[2]) $("draftTitle").textContent = "✅ Sélection validée — en attente de l'hôte…";
+  show("draftPanel");
+}
+function validateDraft() {
+  if (draftSel.length !== 4) return;
+  if (mode === "local") {
+    if (!draftReady[1]) {
+      drafts[1] = draftSel.slice(); draftReady[1] = true; draftSel = [];
+      buildDraftUI(); sndTrig();
+    } else {
+      drafts[2] = draftSel.slice(); draftReady[2] = true;
+      finishDraft();
+    }
+    return;
+  }
+  if (mode === "ai") {
+    drafts[1] = draftSel.slice(); draftReady[1] = true;
+    drafts[2] = randomDraft(); draftReady[2] = true;
+    finishDraft();
+    return;
+  }
+  if (mode === "host") {
+    drafts[1] = draftSel.slice(); draftReady[1] = true;
+    broadcastState();
+    if (draftReady[2]) finishDraft();
+    else { hide("draftPanel"); setStatus("⏳ Draft validé — en attente de l adversaire…"); }
+    return;
+  }
+  if (mode === "guest") {
+    drafts[2] = draftSel.slice(); draftReady[2] = true;
+    sendMsg({ t: "draft_done", chars: drafts[2] });
+    hide("draftPanel"); setStatus("⏳ Draft envoyé — en attente de l hôte…");
+  }
+}
+function finishDraft() {
+  hide("draftPanel");
+  startSetup();
+}
+function onDraftTimeout() {
+  // random for whoever hasn't picked (executor: host / local / ai)
+  if (mode === "guest" || mode === "spectator") return;
+  if (mode === "local") {
+    if (!draftReady[1]) { drafts[1] = draftSel.length === 4 ? draftSel.slice() : randomDraft(); draftReady[1] = true; draftSel = []; }
+    if (!draftReady[2]) { drafts[2] = draftSel.length === 4 ? draftSel.slice() : randomDraft(); draftReady[2] = true; }
+  } else if (mode === "ai") {
+    if (!draftReady[1]) { drafts[1] = draftSel.length === 4 ? draftSel.slice() : randomDraft(); draftReady[1] = true; }
+    if (!draftReady[2]) { drafts[2] = randomDraft(); draftReady[2] = true; }
+  } else { // host
+    if (!draftReady[1]) { drafts[1] = randomDraft(); draftReady[1] = true; }
+    if (!draftReady[2]) { drafts[2] = randomDraft(); draftReady[2] = true; }
+  }
+  flash("⏰ Draft expiré — sélection aléatoire !");
+  finishDraft();
 }
 // Ressuscitation : colle le jeton au but du camp, compte comme le coup du tour.
 function applyRevive(idx) {
@@ -810,11 +1262,13 @@ function tokenAt(p, filter) {
   }
   return -1;
 }
-function ownTokenAt(p) { return tokenAt(p, (b) => canPlaySide(b.owner)); }
+function ownTokenAt(p) { for (let i = 0; i < bodies.length; i++) { const b = bodies[i]; if (b.type !== "token" || !b.alive || b.out) continue; if (!canFlick(i)) continue; if (Math.hypot(p.x - b.x, p.y - b.y) <= b.r + 6) return i; } return -1; }
 function pointerDown(e) {
   const p = canvasPos(e);
   let idx = -1;
-  if (phase === "setup") {
+  if (wallAim && phase === "aim") {
+    drag = { kind: "wallaim", x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+  } else if (phase === "setup") {
     idx = tokenAt(p, (b) => mode === "local" || (mode !== null && b.owner === mySide));
     if (idx >= 0) drag = { kind: "setup", idx, x: p.x, y: p.y, px: bodies[idx].x, py: bodies[idx].y };
   } else if (phase === "aim") {
@@ -823,6 +1277,9 @@ function pointerDown(e) {
   } else if (phase === "benshot" && isActingPlayer()) {
     const ball = bodies[8];
     if (Math.hypot(p.x - ball.x, p.y - ball.y) <= ball.r + 14) drag = { kind: "ballaim", idx: 8, x: p.x, y: p.y };
+  } else if (phase === "cyrilou_shot" && isActingPlayer()) {
+    const ball = bodies[8];
+    if (Math.hypot(p.x - ball.x, p.y - ball.y) <= ball.r + 16) drag = { kind: "ballaim", idx: 8, x: p.x, y: p.y };
   } else if (phase === "synfo_pick" && isActingPlayer()) {
     idx = tokenAt(p, (b) => b.owner === actPlayer);
     if (idx >= 0) {
@@ -830,9 +1287,20 @@ function pointerDown(e) {
       else startSynfoOrient(idx);
       return;
     }
-  } else if (phase === "synfo_orient" && isActingPlayer()) {
+  } else if ((phase === "synfo_orient" || phase === "cyrilou_orient") && isActingPlayer()) {
     const ball = bodies[8];
     if (Math.hypot(p.x - ball.x, p.y - ball.y) <= ball.r + 16) drag = { kind: "ballplace", idx: 8, x: p.x, y: p.y, px: ball.x, py: ball.y };
+  } else if (phase === "mizterio_target" && isActingPlayer()) {
+    // cible de Mizterio : n'importe quel jeton (mort autorisé, sorti exclu)
+    for (let i = 0; i < 8; i++) {
+      const b = bodies[i];
+      if (!b || b.type !== "token" || b.out || i === mizEnemy) continue;
+      if (Math.hypot(p.x - b.x, p.y - b.y) <= b.r + 6) {
+        if (mode === "guest") { sendMsg({ t: "act", kind: "miz_swap", idx: i }); mizCands = []; mizEnemy = -1; phase = "aim"; }
+        else { applyAct("miz_swap", { idx: i }); }
+        return;
+      }
+    }
   }
   if (drag) { try { cv.setPointerCapture(e.pointerId); } catch (err) {} e.preventDefault(); }
 }
@@ -847,6 +1315,10 @@ function pointerMove(e) {
     if (b.owner === 1) x = Math.min(x, W / 2 - b.r - 3); else x = Math.max(x, W / 2 + b.r + 3);
     x = Math.max(b.r + 12, Math.min(W - b.r - 12, x));
     drag.px = x; drag.py = y; e.preventDefault(); return;
+  }
+  if (drag.kind === "wallaim") {
+    drag.x2 = p.x; drag.y2 = p.y;
+    e.preventDefault(); return;
   }
   if (drag.kind === "ballplace") {
     // orientation du ballon : contraint au cercle autour du jeton cible
@@ -868,6 +1340,15 @@ function pointerUp(e) {
   if (!drag) return;
   const b = bodies[drag.idx];
   const kind = drag.kind;
+  if (kind === "wallaim") {
+    const side = mode === "local" ? turn : mySide;
+    const x1 = drag.x1, y1 = drag.y1, x2 = drag.x2, y2 = drag.y2;
+    drag = null;
+    if (Math.hypot(x2 - x1, y2 - y1) < 10) { setStatus("❌ Mur trop court — recommence."); return; }
+    if (!wallArmed(side)) { setStatus("❌ Merlinpinpin doit d'abord être déplacé pour replacer son mur."); return; }
+    placeWall(side, x1, y1, x2, y2);
+    return;
+  }
   if (kind === "setup") {
     if (Math.hypot(drag.px - b.x, drag.py - b.y) < 5 && b.char) { showCharPanel(b.char, b.owner); drag = null; return; }
     if (validSpot(b, drag.px, drag.py, false)) { b.x = drag.px; b.y = drag.py; setStatus("Position ok — valide quand tu es prêt."); if (mode === "host" && netUp) broadcastState(); }
@@ -875,13 +1356,14 @@ function pointerUp(e) {
     drag = null; return;
   }
   if (kind === "ballplace") {
-    // orientation Synfo : position du ballon autour de l'allié
+    // orientation Synfo / Cyrilou : position du ballon autour de l'allié
     const pos = { x: drag.px !== undefined ? drag.px : b.x, y: drag.py !== undefined ? drag.py : b.y };
+    const isCyr = phase === "cyrilou_orient";
     drag = null;
     if (mode === "guest") {
       bodies[8].x = pos.x; bodies[8].y = pos.y;
-      sendMsg({ t: "act", kind: "synfo_place", x: pos.x, y: pos.y });
-    } else applyAct("synfo_place", pos);
+      sendMsg({ t: "act", kind: isCyr ? "cyrilou_place" : "synfo_place", x: pos.x, y: pos.y });
+    } else applyAct(isCyr ? "cyrilou_place" : "synfo_place", pos);
     return;
   }
   const dx = b.x - drag.x, dy = b.y - drag.y;
@@ -895,6 +1377,13 @@ function pointerUp(e) {
       b.vx = vx; b.vy = vy; phase = "moving"; pendIdx = -1; pendArmer = turn; armTimer(0); burst(b.x, b.y, ["#ffffff", "#ffd166"], 7, 2.5); sndFlick(); updateBar();
     } else applyFlick(idx, vx, vy);
   } else if (kind === "ballaim") {
+    if (phase === "cyrilou_shot") {
+      // tir Cyrilou : vitesse ×2, buts solides, aucun trigger pendant le vol
+      const vx2 = vx * 2, vy2 = vy * 2;
+      if (mode === "guest") { sendMsg({ t: "act", kind: "cyrilou_shot", vx: vx2, vy: vy2 }); b.vx = vx2; b.vy = vy2; cyrilouShot = true; phase = "moving"; pendIdx = -1; pendArmer = actPlayer; armTimer(0); burst(b.x, b.y, ["#1f8a70", "#ffffff"], 10, 3); sndFlick(); updateBar(); }
+      else applyAct("cyrilou_shot", { vx: vx2, vy: vy2 });
+      return;
+    }
     if (mode === "guest") { sendMsg({ t: "act", kind: "benp_shot", vx, vy }); b.vx = vx; b.vy = vy; phase = "moving"; pendIdx = -1; pendArmer = actPlayer; armTimer(0); burst(b.x, b.y, ["#ffd166"], 7, 2.5); sndFlick(); }
     else applyAct("benp_shot", { vx, vy });
   }
@@ -908,6 +1397,7 @@ cv.addEventListener("lostpointercapture", pointerUp);
 cv.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   if (drag) { drag = null; setPrompt("↩️ Coup annulé — reprends quand tu veux."); sndUi(); }
+  else if (wallAim) { wallAim = false; setPrompt("↩️ Placement du mur annulé."); sndUi(); }
 });
 
 // ---------- Rendu ----------
@@ -941,6 +1431,37 @@ function draw() {
   ctx.beginPath(); ctx.arc(W / 2, H / 2, 70, 0, Math.PI * 2); ctx.stroke();
   drawGoal(GOAL_L, "#ff6b6b");
   drawGoal(GOAL_RR, "#5b9bd4");
+  // murs de Merlinpinpin (v8)
+  for (const side of [1, 2]) {
+    const wl = walls[side];
+    if (!wl) continue;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.shadowColor = "#8f6fd0"; ctx.shadowBlur = 12;
+    ctx.strokeStyle = side === 1 ? "#c9a24b" : "#8f6fd0";
+    ctx.lineWidth = WALL_TH;
+    ctx.beginPath(); ctx.moveTo(wl.x1, wl.y1); ctx.lineTo(wl.x2, wl.y2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(wl.x1, wl.y1); ctx.lineTo(wl.x2, wl.y2); ctx.stroke();
+    ctx.restore();
+  }
+  if (drag && drag.kind === "wallaim") {
+    // preview du mur : longueur clampée à WALL_LEN
+    const dx = drag.x2 - drag.x1, dy = drag.y2 - drag.y1, dd = Math.hypot(dx, dy) || 1;
+    const L = Math.min(dd, WALL_LEN);
+    const ex = drag.x1 + dx / dd * L, ey = drag.y1 + dy / dd * L;
+    ctx.save();
+    ctx.setLineDash([8, 6]);
+    ctx.strokeStyle = "#b9b0ff"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(drag.x1, drag.y1); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(drag.x1, drag.y1, 5, 0, Math.PI * 2); ctx.stroke();
+    ctx.font = "600 12px system-ui"; ctx.fillStyle = "#e8e2ff"; ctx.textAlign = "center";
+    ctx.fillText(Math.round(L) + " / " + WALL_LEN + " px", (drag.x1 + ex) / 2, (drag.y1 + ey) / 2 - 12);
+    ctx.restore();
+  }
   for (let i = 0; i < bodies.length; i++) {
     const b = bodies[i];
     if (b.type === "token" && !b.out) drawToken(b, i);
@@ -1003,10 +1524,21 @@ function draw() {
   if (phase === "triggerchoice") {
     drawBanner((isActingPlayer() || mode === "local") ? "🎁 CHOISIS TON EFFET !" : "⏳ Choix de l'adversaire…", true);
   }
+  if (phase === "cyrilou_choice" || phase === "cyrilou_orient" || phase === "cyrilou_shot") {
+    drawBanner(turnInfo.counter ? "⚡ CONTRE JEU — 🎪 CYRILOU : " + (actPlayer === 1 ? "ROUGE" : "BLEU") : "🎪 CYRILOU — " + (actPlayer === 1 ? "ROUGE" : "BLEU"), isActingPlayer() || mode === "local");
+  }
+  if (phase === "mizterio_pick" || phase === "mizterio_target") {
+    drawBanner(turnInfo.counter ? "⚡ CONTRE JEU — 🎭 MIZTERIO : " + (actPlayer === 1 ? "ROUGE" : "BLEU") : "🎭 MIZTERIO — " + (actPlayer === 1 ? "ROUGE" : "BLEU"), isActingPlayer() || mode === "local");
+  }
   // bouton de ressuscitation visible si le joueur actif a un jeton éliminé
   const rev = $("reviveBtn");
   if (phase === "aim" && isActingPlayer() && ownDeadIdx(turn).length > 0) rev.style.display = "block";
   else rev.style.display = "none";
+  // bouton mur : visible pour l'acteur local en phase aim si Merlin est armé
+  const wb = $("btnWall");
+  const wside = mode === "local" ? turn : mySide;
+  if (phase === "aim" && mode !== "spectator" && isActingPlayer() && wallArmed(wside)) wb.style.display = "block";
+  else { wb.style.display = "none"; }
   // messages contextuels (prompts : n'écrasent pas un flash récent)
   if (mode === "spectator" && netUp && Date.now() - lastStateAt > 10000) setStatus("⚠️ Flux interrompu — en attente de l'hôte…");
   else if (phase === "setup") {
@@ -1014,12 +1546,16 @@ function draw() {
     setPrompt("🧩 Placement : " + who + " puis valide en bas.");
   } else if (phase === "aim" && mode) {
     const mine = mode === "local" || turn === mySide || (mode === "ai" && turn === 1);
-    if (mine) setPrompt("👉 Tire en arrière sur un de tes jetons" + (turnInfo.bonusActive ? " — 🎁 pichenette bonus" : "") + (ownDeadIdx(turn).length ? " OU 🩹 ressuscite (bouton bas gauche)" : "") + " · clic droit = annuler un drag.");
+  if (mine) setPrompt("👉 Tire en arrière sur un de tes jetons" + (turnInfo.drasahExtra ? " — 🎁 rejoue ! " : "") + (Object.keys(bonusFlicks).some((k) => bonusFlicks[k] > 0) ? " — 🎁 pichenettes bonus (jetons cerclés d'or) " : "") + (ownDeadIdx(turn).length ? " OU 🩹 ressuscite (bouton bas gauche) " : "") + (wallArmed(mode === "local" ? turn : mySide) && bodies.some((b) => b.char === "merlin") ? " OU 🧱 mur (ESPACE) " : "") + "· clic droit = annuler un drag.");
     else if (mode === "ai") setPrompt("🤖 L'IA réfléchit…");
     else setPrompt("⏳ Tour de l'adversaire…");
   } else if (phase === "benshot" && (mode !== "guest" || isActingPlayer())) setPrompt(isActingPlayer() ? "🎁 BENP : TIR GRATUIT — tire en arrière sur le ballon (cercle jaune) !" : "🎁 BenP offre un tir gratuit à l'adversaire…");
   else if (phase === "synfo_pick" && (mode !== "guest" || isActingPlayer())) setPrompt("🎯 Passe : clique sur le jeton allié qui reçoit le ballon.");
   else if (phase === "triggerchoice" && (mode !== "guest" || isActingPlayer())) setPrompt(isActingPlayer() ? "🎁 Deux effets touchés — choisis-en un (l'autre sera perdu) !" : "⏳ L'adversaire choisit son effet…");
+  else if (phase === "cyrilou_orient" && (mode !== "guest" || isActingPlayer())) setPrompt("🎪 Glisse le ballon autour de Cyrilou pour l'orienter, puis relâche.");
+  else if (phase === "cyrilou_shot" && (mode !== "guest" || isActingPlayer())) setPrompt("🎪 Tire en arrière sur le ballon : puissance ×2 — ce tir ne peut pas marquer !");
+  else if (phase === "mizterio_target" && (mode !== "guest" || isActingPlayer())) setPrompt("🎭 Clique sur n'importe quel jeton (mort autorisé, sorti exclu) pour l'échanger avec l'ennemi touché.");
+  else if (phase === "draft") setPrompt("🃏 Draft : choisis 4 personnages parmi 8.");
   updateTimerPill();
   drawFx();
 }
@@ -1027,12 +1563,12 @@ let lastTickSec = 0;
 function updateTimerPill() {
   const p = $("timerPill");
   if (!mode || phase === "over" || phase === "moving" || phase === "goal" || phase === "revive_pick") { p.classList.add("hidden"); return; }
-  const dl = phase === "setup" ? setupDeadline : actionDeadline;
+  const dl = phase === "draft" ? draftDeadline : (phase === "setup" ? setupDeadline : actionDeadline);
   if (!dl) { p.classList.add("hidden"); return; }
   const s = Math.ceil((dl - Date.now()) / 1000);
   if (s < 0) { p.classList.add("hidden"); return; }
   p.classList.remove("hidden");
-  p.textContent = (phase === "setup" ? "🧩 " : "⏱️ ") + s + "s";
+  p.textContent = (phase === "draft" ? "🃏 " : (phase === "setup" ? "🧩 " : "⏱️ ")) + s + "s";
   p.classList.toggle("low", s <= 5);
   if (s <= 5 && s >= 1) { const sec = Math.floor(Date.now() / 1000); if (lastTickSec !== sec) { lastTickSec = sec; sndTick(); } }
 }
@@ -1072,7 +1608,15 @@ function drawToken(b, i) {
   ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.clip();
   const av = AVATARS[b.char];
   if (av && av.complete && av.naturalWidth) ctx.drawImage(av, b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
-  else { ctx.fillStyle = b.owner === 1 ? "#c0392b" : "#2166a8"; ctx.fill(); }
+  else if (AVATAR_DATA[b.char]) { ctx.fillStyle = b.owner === 1 ? "#c0392b" : "#2166a8"; ctx.fill(); }
+  else { // v8 : nouveau perso sans image → pastille couleur + initiales
+    ctx.fillStyle = CHAR_COLORS[b.char] || (b.owner === 1 ? "#c0392b" : "#2166a8");
+    ctx.fill();
+    ctx.font = "800 20px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#fff";
+    const nm = CHAR_NAMES[b.char] || b.char;
+    ctx.fillText(nm.slice(0, 2).toUpperCase(), b.x, b.y + 1);
+  }
   if (!b.alive) { ctx.fillStyle = "rgba(10,10,10,0.62)"; ctx.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2); }
   ctx.restore();
   ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
@@ -1092,6 +1636,17 @@ function drawToken(b, i) {
     const pulse = 3 + Math.sin(Date.now() / 150) * 2;
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r + pulse, 0, Math.PI * 2);
     ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 3; ctx.stroke();
+  }
+  if (phase === "aim" && (bonusFlicks[i] || 0) > 0 && b.alive && !b.out) {
+    // v8 : jeton avec pichenette bonus Leureduthé → anneau d'or
+    const pulse = 2 + Math.sin(Date.now() / 160) * 1.5;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 4 + pulse, 0, Math.PI * 2);
+    ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 2.5; ctx.stroke();
+  }
+  if (phase === "mizterio_target" && i !== mizEnemy && !b.out) {
+    const pulse = 3 + Math.sin(Date.now() / 150) * 2;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r + pulse, 0, Math.PI * 2);
+    ctx.strokeStyle = "#c77dff"; ctx.lineWidth = 3; ctx.stroke();
   }
 }
 function drawBall(b) {
@@ -1150,15 +1705,18 @@ function pwColor(p) { return p < .5 ? "#ffd166" : "#ff6b6b"; }
 
 // ---------- v7 : timers autoritaires (hôte / local / IA) ----------
 function armTimer(ms) { actionDeadline = ms > 0 ? Date.now() + ms : 0; }
-const ACTION_PHASES = ["aim", "benshot", "synfo_choice", "synfo_pick", "synfo_orient", "triggerchoice"];
+const ACTION_PHASES = ["aim", "benshot", "synfo_choice", "synfo_pick", "synfo_orient", "triggerchoice", "cyrilou_choice", "cyrilou_orient", "cyrilou_shot", "mizterio_pick", "mizterio_target"];
 function onActionTimeout() {
-  drag = null;
+  drag = null; wallAim = false;
   armTimer(0);
   if (phase === "aim") { flash("⏰ Temps écoulé — tour passé !"); endTurn(); }
   else if (phase === "benshot") { flash("⏰ Temps écoulé — tir gratuit perdu !"); passTarget = -1; hide("synfoPanel"); endTurn(); }
   else if (phase === "synfo_choice") { flash("⏰ Temps écoulé — effet perdu !"); applyAct("synfo_stay", {}); }
   else if (phase === "synfo_pick" || phase === "synfo_orient") { flash("⏰ Temps écoulé — passe perdue !"); passTarget = -1; hide("synfoPanel"); endTurn(); }
   else if (phase === "triggerchoice") { flash("⏰ Temps écoulé — effets perdus !"); trigOpts = []; hide("trigPanel"); endTurn(); }
+  else if (phase === "cyrilou_choice") { flash("⏰ Temps écoulé — effet perdu !"); hide("cyrilouPanel"); applyAct("cyrilou_stay", {}); }
+  else if (phase === "cyrilou_orient" || phase === "cyrilou_shot") { flash("⏰ Temps écoulé — tir de Cyrilou perdu !"); hide("cyrilouPanel"); endTurn(); }
+  else if (phase === "mizterio_pick" || phase === "mizterio_target") { flash("⏰ Temps écoulé — échange de Mizterio perdu !"); mizCands = []; mizEnemy = -1; hide("mizPanel"); endTurn(); }
 }
 function onSetupTimeout() {
   flash("⏰ Placement terminé — la partie commence !");
@@ -1173,6 +1731,7 @@ setInterval(() => {
   if (!mode || mode === "guest" || mode === "spectator") return;
   const now = Date.now();
   if (mode === "host") { for (const k in viewers) if (now - viewers[k] > 12000) delete viewers[k]; updateSpecPill(Object.keys(viewers).length, Object.keys(viewers)); }
+  if (phase === "draft" && draftDeadline && now > draftDeadline) { onDraftTimeout(); return; }
   if (phase === "setup" && setupDeadline && now > setupDeadline) { onSetupTimeout(); return; }
   if (actionDeadline && ACTION_PHASES.indexOf(phase) >= 0 && now > actionDeadline) onActionTimeout();
 }, 250);
@@ -1298,6 +1857,7 @@ function aiPlay() {
   for (let i = 4; i < 8; i++) {
     const t = bodies[i];
     if (!t.alive || t.out) continue;
+    if (!canFlick(i)) continue;
     for (const tg of targets) {
       const base = Math.atan2(tg.y - t.y, tg.x - t.x);
       for (const sp of [-0.3, 0, 0.3]) {
@@ -1372,6 +1932,45 @@ function aiSynfoOrient() {
   const R = tgt.r + BALL_R + 2;
   applyAct("synfo_place", { x: tgt.x + dx / dd * R, y: tgt.y + dy / dd * R });
 }
+function aiCyrilou() {
+  if (mode !== "ai" || phase !== "cyrilou_choice" || actPlayer !== 2) return;
+  if (Math.random() < 0.5) { applyAct("cyrilou_stay", {}); return; }
+  applyAct("cyrilou_shoot", {});
+}
+function aiCyrilouOrient() {
+  if (mode !== "ai" || phase !== "cyrilou_orient" || actPlayer !== 2) return;
+  const tgt = bodies[trigCyrilouIdx()];
+  if (!tgt) { endTurn(); return; }
+  // orienter le ballon côté but adverse avec un angle aléatoire autour de Cyrilou
+  const ang = Math.atan2(GOAL_L.y - tgt.y, GOAL_L.x - tgt.x) + (Math.random() - 0.5) * 1.2;
+  const R = tgt.r + BALL_R + 2;
+  applyAct("cyrilou_place", { x: tgt.x + Math.cos(ang) * R, y: tgt.y + Math.sin(ang) * R });
+}
+function aiCyrilouShot() {
+  if (mode !== "ai" || phase !== "cyrilou_shot" || actPlayer !== 2) return;
+  const ball = bodies[8];
+  const dx = GOAL_L.x - ball.x, dy = GOAL_L.y - ball.y;
+  const dd = Math.hypot(dx, dy) || 1;
+  const v = MAX_DRAG * POWER * 0.6;
+  applyAct("cyrilou_shot", { vx: dx / dd * v, vy: dy / dd * v });
+}
+function aiMizterio() {
+  if (mode !== "ai" || phase !== "mizterio_pick" || actPlayer !== 2) return;
+  if (!mizCands.length) { mizPass(); return; }
+  if (Math.random() < 0.25) { mizPass(); return; }
+  applyAct("miz_pick", { idx: mizCands[Math.floor(Math.random() * mizCands.length)] });
+}
+function aiMizTarget() {
+  if (mode !== "ai" || phase !== "mizterio_target" || actPlayer !== 2) return;
+  const opts = [];
+  for (let i = 0; i < 8; i++) {
+    const b = bodies[i];
+    if (!b || b.type !== "token" || b.out || i === mizEnemy) continue;
+    opts.push(i);
+  }
+  if (!opts.length) { endTurn(); return; }
+  applyAct("miz_swap", { idx: opts[Math.floor(Math.random() * opts.length)] });
+}
 function aiSetup() {
   const ys = [H / 2 - 150, H / 2 - 50, H / 2 + 50, H / 2 + 150];
   for (let i = 4; i < 8; i++) {
@@ -1440,7 +2039,7 @@ function mqConnect() {
         if (!netUp) {
           cleanupNet();
           $("btnDoJoin").disabled = false; $("btnDoJoin").textContent = "Rejoindre";
-          alert("Partie introuvable. Vérifie le code ET que vous avez TOUS LES DEUX la dernière version (le menu doit afficher « v7 » — sinon Ctrl+F5). Attends aussi que l'hôte voie bien son code affiché.");
+          alert("Partie introuvable. Vérifie le code ET que vous avez TOUS LES DEUX la dernière version (le menu doit afficher « v8 » — sinon Ctrl+F5). Attends aussi que l'hôte voie bien son code affiché.");
         }
       }, 12000);
     }
@@ -1451,7 +2050,7 @@ function mqConnect() {
           cleanupNet();
           mode = null;
           hide("specLobby"); show("menu");
-          alert("Aucune partie en cours avec ce code. Vérifie le code, que la partie est bien créée, et que l'hôte a la dernière version (v7).");
+          alert("Aucune partie en cours avec ce code. Vérifie le code, que la partie est bien créée, et que l'hôte a la dernière version (v8).");
         }
       }, 12000);
     }
@@ -1587,6 +2186,10 @@ function broadcastState() {
       t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady, terrain, trigOpts,
       dlIn: actionDeadline ? Math.max(0, actionDeadline - Date.now()) : 0,
       setupIn: (phase === "setup" && setupDeadline) ? Math.max(0, setupDeadline - Date.now()) : 0,
+      draftIn: (phase === "draft" && draftDeadline) ? Math.max(0, draftDeadline - Date.now()) : 0,
+      drafts: { 1: draftReady[1] ? drafts[1] : null, 2: draftReady[2] ? drafts[2] : null },
+      draftReady, walls, bf: bonusFlicks,
+      mizCands: (phase === "mizterio_pick") ? mizCands : [],
       viewers: vnames.length, vnames: vnames,
       names: specNames
     });
@@ -1603,6 +2206,18 @@ function onMsg(m) {
     else if (m.kind === "synfo_pick" && m.idx !== undefined && (phase === "synfo_choice" || phase === "synfo_pick")) startSynfoOrient(m.idx);
     else if (m.kind === "synfo_place" && phase === "synfo_orient") applyAct("synfo_place", { x: m.x, y: m.y });
     else if (m.kind === "trig_choice" && m.idx !== undefined && phase === "triggerchoice") applyAct("trig_choice", { idx: m.idx });
+    else if (m.kind === "cyrilou_stay" && phase === "cyrilou_choice") applyAct("cyrilou_stay", {});
+    else if (m.kind === "cyrilou_shoot" && phase === "cyrilou_choice") applyAct("cyrilou_shoot", {});
+    else if (m.kind === "cyrilou_place" && phase === "cyrilou_orient") applyAct("cyrilou_place", { x: m.x, y: m.y });
+    else if (m.kind === "cyrilou_shot" && phase === "cyrilou_shot") applyAct("cyrilou_shot", { vx: m.vx, vy: m.vy });
+    else if (m.kind === "miz_pick" && m.idx !== undefined && phase === "mizterio_pick") applyAct("miz_pick", { idx: m.idx });
+    else if (m.kind === "miz_swap" && m.idx !== undefined && phase === "mizterio_target") applyAct("miz_swap", { idx: m.idx });
+    else if (m.kind === "miz_pass") applyAct("miz_pass", {});
+  } else if (m.t === "draft_done" && mode === "host") {
+    if (phase === "draft" && !draftReady[2] && Array.isArray(m.chars) && m.chars.length === 4 && m.chars.every((c) => CHARS.indexOf(c) >= 0)) {
+      drafts[2] = m.chars.slice(); draftReady[2] = true;
+      if (draftReady[1]) finishDraft(); else broadcastState();
+    }
   } else if (m.t === "setup_done" && mode === "host") {
     if (phase === "setup" && Array.isArray(m.pos) && m.pos.length === 4) {
       for (let i = 0; i < 4; i++) {
@@ -1622,6 +2237,11 @@ function onMsg(m) {
     goalScorer = m.goalScorer;
     if (m.turnInfo) turnInfo = m.turnInfo;
     if (m.trigOpts) trigOpts = m.trigOpts;
+    if (m.walls) walls = m.walls;
+    if (m.bf) bonusFlicks = m.bf;
+    if (m.drafts) { if (m.drafts[1]) { drafts[1] = m.drafts[1]; draftReady[1] = true; } if (m.drafts[2]) { drafts[2] = m.drafts[2]; draftReady[2] = true; } }
+    draftDeadline = (m.phase === "draft" && m.draftIn) ? Date.now() + m.draftIn : (m.phase === "draft" ? draftDeadline : 0);
+    if (m.mizCands) mizCands = m.mizCands;
     if (m.terrain && TERRAINS[m.terrain]) terrain = m.terrain;
     if (m.names) specNames = m.names;
     if (m.viewers !== undefined) updateSpecPill(m.viewers, m.vnames || []);
@@ -1643,15 +2263,24 @@ function onMsg(m) {
     } else $("setupBtn").style.display = "none";
     if (phase === "synfo_choice" && isActingPlayer() && prevPhase !== "synfo_choice") showSynfoPanel();
     if (phase === "triggerchoice" && isActingPlayer() && prevPhase !== "triggerchoice") showTrigPanel();
+    // v8 : draft, Cyrilou, Mizterio côté invité/spectateur
+    if (phase === "draft") {
+      if (mode === "guest" && !draftReady[mySide] && prevPhase !== "draft") { draftSel = []; buildDraftUI(); }
+      if (mode === "spectator" && prevPhase !== "draft") setStatus("🃏 Draft en cours…");
+    } else if (prevPhase === "draft") hide("draftPanel");
+    if (phase === "cyrilou_choice" && isActingPlayer() && prevPhase !== "cyrilou_choice") show("cyrilouPanel");
+    if (phase === "mizterio_pick" && isActingPlayer() && prevPhase !== "mizterio_pick") showMizPanel();
+    if (prevPhase === "cyrilou_choice" && phase !== "cyrilou_choice" && phase !== "cyrilou_shot") hide("cyrilouPanel");
+    if ((prevPhase === "mizterio_pick" || prevPhase === "mizterio_target") && phase !== "mizterio_pick" && phase !== "mizterio_target") hide("mizPanel");
     // spectateur : FX/sons sur les transitions de phase (pas de logique locale)
     if (mode === "spectator" && prevPhase !== phase) {
       if (phase === "goal" || phase === "over") { const gx = goalScorer === 1 ? GOAL_RR.x : GOAL_L.x; burst(gx, GOAL_L.y, ["#ffd166", "#ff6b6b", "#5b9bd4", "#fff"], 50, 5); sndGoal(); }
-      else if (phase === "benshot" || phase === "synfo_choice") { const ball = bodies[8]; burst(ball.x, ball.y, ["#ffd166", "#fff"], 24, 3.5); if (m.turnInfo && m.turnInfo.counter) sndCounter(); else sndTrig(); }
+      else if (phase === "benshot" || phase === "synfo_choice" || phase === "cyrilou_choice" || phase === "triggerchoice" || phase === "mizterio_pick") { const ball = bodies[8]; burst(ball.x, ball.y, ["#ffd166", "#fff"], 24, 3.5); if (m.turnInfo && m.turnInfo.counter) sndCounter(); else sndTrig(); }
     }
     if (m.phase === "over" && prevPhase !== "over") endGame(m.goalScorer);
     if ((prevPhase === "synfo_choice" || prevPhase === "synfo_pick") && phase !== "synfo_choice" && phase !== "synfo_pick") hide("synfoPanel");
     if (prevPhase === "triggerchoice" && phase !== "triggerchoice") hide("trigPanel");
-    updateBar(m.turnInfo ? m.turnInfo.bonusActive : false);
+    updateBar((m.turnInfo && m.turnInfo.drasahExtra) || bonusPending());
   } else if (m.t === "elo" && mode === "guest") {
     const p = getProfile();
     p.elo = m.yourElo;
@@ -1758,7 +2387,11 @@ const CHAR_INFO = {
   drasah: "Jouable deux fois de suite : le jouer offre une 2e pichenette immédiate (une fois, pas de chaîne).",
   wun: "Retourne tout jeton adverse qu'il touche, à tout moment (jeton mort : ne se joue plus mais bloque). Ranimable uniquement par le contact d'un jeton allié.",
   benp: "Si le ballon le touche (même pendant le tour adverse), à la fin de la course du ballon son camp obtient un tir gratuit depuis la position du ballon.",
-  synfo: "Si le ballon la touche, à la fin de la course : laisser le ballon OU passe : choisis l'allié puis oriente librement le ballon autour de lui. Combo : une passe à BenP déclenche son tir gratuit !"
+  synfo: "Si le ballon la touche, à la fin de la course : laisser le ballon OU passe : choisis l'allié puis oriente librement le ballon autour de lui. Combo : une passe à BenP déclenche son tir gratuit !",
+  leure: "Chaque allié qu'il touche pendant sa course gagne immédiatement +1 pichenette (utilisable dans le même tour). Les bonus non utilisés sont perdus à la fin du tour.",
+  merlin: "Immobile : ni un jeton adverse ni le ballon ne peuvent le déplacer (ils rebondissent). Barre ESPACE (ou bouton 🧱) : place son mur unique (l'ancien disparaît), qui fait rebondir tout. Utilisable uniquement s'il a bougé depuis la dernière utilisation (pichenetté ou poussé par un allié). Sensible à Wun.",
+  cyrilou: "Si le ballon le touche : laisser le ballon OU tirer — le ballon vient à lui, tu l'oriente autour de lui puis tires avec une puissance ×2. Ce tir ne peut PAS marquer (les buts rebondissent) et ne déclenche aucune autre capacité. Combo : une passe à Cyrilou déclenche son tir !",
+  mizterio: "À la fin de la course, s'il a touché un (ou plusieurs) ennemi(s) — même en défense — il peut échanger la position de l'ennemi de son choix avec celle de n'importe quel autre jeton du plateau (mort autorisé, sorti exclu)."
 };
 let charTmr = null;
 function showCharPanel(char, owner) {
@@ -1781,7 +2414,7 @@ function startGame(m, side) {
   if (mode === "ai") setStatus("🤖 Tu es 🔴 Rouge — l'IA est 🔵 Bleu.");
   if (mode === "host" || mode === "guest") { $("chatBtn").classList.remove("hidden"); }
   updateNamesPill();
-  startSetup();
+  startDraft();
   if (mode === "host") broadcastState();
 }
 function startSetup() {
@@ -1820,17 +2453,19 @@ function endGame(winner) {
   if (ranked && mode === "host" && oppProfile) settleElo(winner === 1);
 }
 function rematch() {
-  startSetup();
+  startDraft();
   if (mode === "host") broadcastState();
 }
 function backMenu() {
   cleanupNet(); clearTimeout(aiTimer); mode = null; ranked = false; oppProfile = null;
   $("setupBtn").style.display = "none";
-  $("reviveBtn").style.display = "none";
-  hide("winOverlay"); hide("synfoPanel"); hide("trigPanel"); hide("revivePanel"); show("menu");
+  $("reviveBtn").style.display = "none"; $("btnWall").style.display = "none";
+  hide("winOverlay"); hide("synfoPanel"); hide("trigPanel"); hide("revivePanel"); hide("draftPanel"); hide("cyrilouPanel"); hide("mizPanel"); show("menu");
   hide("specLobby"); hide("chatPanel"); hide("specPill"); hide("namesPill"); hide("timerPill"); hide("eloPill");
   $("chatBtn").classList.add("hidden"); chatOpen = false; chatUnread = 0; $("chatBadge").classList.add("hidden");
   fx = [];
+  walls = { 1: null, 2: null }; wallUsePos = { 1: null, 2: null }; wallAim = false;
+  draftReady = { 1: false, 2: false }; draftSel = []; draftDeadline = 0;
 }
 
 // ---------- Boutons ----------
@@ -1885,6 +2520,26 @@ function synfoChoose(wantPass) {
 }
 $("btnSynfoStay").onclick = () => synfoChoose(false);
 $("btnSynfoPass").onclick = () => synfoChoose(true);
+// ---------- Boutons v8 : Cyrilou, Mizterio, draft, mur ----------
+$("btnCyrilouStay").onclick = () => cyrilouChoose(false);
+$("btnCyrilouShoot").onclick = () => cyrilouChoose(true);
+$("btnMizPass").onclick = () => mizPass();
+$("btnDraftOk").onclick = () => validateDraft();
+$("btnWall").onclick = () => { toggleWallAim(); };
+function toggleWallAim() {
+  const side = mode === "local" ? turn : mySide;
+  if (phase !== "aim" || mode === "spectator") return;
+  if (!wallArmed(side)) { setStatus("🧱 Merlinpinpin doit d'abord être déplacé (par lui-même ou poussé par un allié) pour replacer son mur."); sndUi(); return; }
+  wallAim = !wallAim;
+  setStatus(wallAim ? "🧱 Trace ton mur : clic-glissé d'un point à un autre (clic droit pour annuler)." : "🧱 Placement du mur annulé.");
+  sndUi();
+}
+document.addEventListener("keydown", (e) => {
+  if (e.code !== "Space") return;
+  if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "BUTTON")) return;
+  e.preventDefault();
+  if (phase === "aim") toggleWallAim();
+});
 $("reviveBtn").onclick = () => {
   if (phase !== "aim" || !isActingPlayer()) return;
   const list = $("reviveList");
@@ -1950,6 +2605,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="KhX5pXqDihKpcUDx3cc2Ww==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="VHsCPIjc2YT+PczoWsvfog==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
