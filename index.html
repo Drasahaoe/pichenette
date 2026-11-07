@@ -161,7 +161,7 @@
       <div class="ch"><img id="miniBenp" alt="BenP"/><span><b>BenP</b> — si le <b>ballon le touche</b> (même pendant le tour adverse), à la fin de la course du ballon son camp obtient un <b>tir gratuit</b> depuis la position du ballon.</span></div>
       <div class="ch"><img id="miniSynfo" alt="Synfo"/><span><b>Synfo</b> — si le <b>ballon la touche</b>, à la fin de la course : laisser le ballon OU <b>passe</b> : choisis l'allié puis <b>oriente librement le ballon autour de lui</b>. Combo : une passe à BenP déclenche son tir gratuit !</span></div>
       <div class="ch"><img id="miniLeure" alt="Leureduthé"/><span><b>Leureduthé</b> — pendant sa course, chaque <b>allié touché</b> gagne une <b>pichenette bonus</b> immédiate (utilisable dans le même tour).</span></div>
-      <div class="ch"><img id="miniMerlin" alt="Merlinpinpin"/><span><b>Merlinpinpin</b> — inamovible : ni jeton adverse ni ballon ne peuvent le déplacer (ses alliés, si). <b>Barre ESPACE</b> : place ou déplace son <b>mur unique</b> (tout rebondit). Il doit avoir été déplacé depuis la dernière utilisation (par lui-même ou poussé par un allié).</span></div>
+      <div class="ch"><img id="miniMerlin" alt="Merlinpinpin"/><span><b>Merlinpinpin</b> — inamovible : ni jeton adverse ni ballon ne peuvent le déplacer (ses alliés, si). <b>Barre ESPACE</b> : place son <b>mur</b> (tout rebondit, l'ancien disparaît). <b>Un seul mur par tour</b>, uniquement s'il a bougé pendant CE tour (pichenetté ou poussé par un allié) — armement non utilisé = perdu en fin de tour. Le mur reste en place jusqu'à son remplacement.</span></div>
       <div class="ch"><img id="miniCyrilou" alt="Cyriloulefilou"/><span><b>Cyriloulefilou</b> — comme BenP si le ballon le touche, mais au choix : <b>laisser</b> la balle suivre son chemin OU <b>shooter</b> : le ballon se colle à lui, tu l'orientes librement puis tires (puissance <b>×2</b>) — ce tir <b>ne peut pas marquer</b> et ne déclenche aucun effet.</span></div>
       <div class="ch"><img id="miniMizterio" alt="Mizterio"/><span><b>Mizterio</b> — à la fin de sa course, il peut <b>échanger la place</b> de n'importe quel ennemi qu'il a touché avec n'importe quel autre jeton du plateau.</span></div>
     </div>
@@ -423,7 +423,9 @@ let mizCands = [];                            // ennemis touchés en attente de 
 let mizEnemy = -1;                            // ennemi choisi, en attente de cible (phase mizterio_target)
 let cyrilouShot = false;                      // tir ×2 de Cyrilou en vol : buts solides, aucun trigger
 let walls = { 1: null, 2: null };             // mur de Merlinpinpin par camp {x1,y1,x2,y2}
-let wallUsePos = { 1: null, 2: null };        // position du Merlin au moment de l'utilisation du mur
+let merlinTurnPos = { 1: null, 2: null };     // position du Merlin au DÉBUT du tour de son camp (armement du mur)
+let wallPlacedTurn = { 1: false, 2: false };  // un seul mur par camp et par tour
+let wallArmRemote = null;                     // miroir réseau (guest/spectateur) de l'armement du mur
 let wallAim = false;                          // mode placement de mur (barre espace)
 let turnFlicks = 0;                           // compteur de pichenettes du tour (garde-fou anti-boucle)
 
@@ -456,6 +458,10 @@ function freshTurnInfo() {
   pendIdx = -1; pendArmer = 0; deferred = []; trigOpts = []; inResolution = false; chainCount = 0;
   bonusFlicks = {}; leureTouched = []; miztouched = []; mizCands = []; mizEnemy = -1;
   cyrilouShot = false; turnFlicks = 0;
+  // Mur de Merlin : armement perdu en fin de tour — on capture la position de départ du nouveau tour
+  wallPlacedTurn = { 1: false, 2: false };
+  merlinTurnPos = { 1: null, 2: null };
+  for (const s of [1, 2]) { const mi3 = merlinIdx(s); if (mi3 >= 0) merlinTurnPos[s] = { x: bodies[mi3].x, y: bodies[mi3].y }; }
 }
 
 // ---------- UI ----------
@@ -654,9 +660,14 @@ function handleContact(a, b) {
     else if (bW && a.owner !== b.owner && a.alive && !a.out) killToken(a);
     if (!simActive) {
       const ia = bodies.indexOf(a), ib = bodies.indexOf(b);
-      // Leureduthé : alliés touchés pendant la course → +1 pichenette chacun à la résolution
-      if (a.char === "leure" && a.alive && !a.out && b.owner === a.owner && b.alive && !b.out) addOnce(leureTouched, ib);
-      if (b.char === "leure" && b.alive && !b.out && a.owner === b.owner && a.alive && !a.out) addOnce(leureTouched, ia);
+      // Leureduthé : alliés touchés pendant SA course → +1 pichenette chacun à la résolution.
+      // Garde : « chaque allié qu'IL touche pendant sa course » — on trace uniquement si le jeton pichenetté
+      // de la course en cours est un Leure du camp qui joue. Sans elle, pichenetter n'importe quel allié
+      // DANS un Leure passif regénérait un bonus à l'infini (ex. Merlin rejouait sans fin).
+      if (turnInfo.flickedChar === "leure") {
+        if (a.char === "leure" && a.owner === turn && a.alive && !a.out && b.owner === a.owner && b.alive && !b.out) addOnce(leureTouched, ib);
+        if (b.char === "leure" && b.owner === turn && b.alive && !b.out && a.owner === b.owner && a.alive && !a.out) addOnce(leureTouched, ia);
+      }
       // Mizterio : ennemis l'ayant touché (ou touchés par lui), dans les deux sens — {e: idx ennemi, o: owner du Mizterio}
       if (a.char === "mizterio" && a.alive && !a.out && b.owner !== a.owner && b.alive && !b.out) addOnce(miztouched, { e: ib, o: a.owner });
       if (b.char === "mizterio" && b.alive && !b.out && a.owner !== b.owner && a.alive && !a.out) addOnce(miztouched, { e: ia, o: b.owner });
@@ -1072,12 +1083,17 @@ function applyMizSwap(e, t) {
 // ---------- v8 : mur de Merlinpinpin ----------
 function merlinIdx(side) { for (let i = 0; i < 8; i++) { const b = bodies[i]; if (b && b.char === "merlin" && b.owner === side) return i; } return -1; }
 function wallArmed(side) {
+  // Règle : un seul mur par tour, armé uniquement si Merlin a bougé PENDANT CE tour
+  // (pichenetté ou poussé par un allié). Armement non utilisé = perdu en fin de tour.
+  // En réseau, guest/spectateur lisent le miroir diffusé par l'hôte.
+  if (mode === "guest" || mode === "spectator") return !!(wallArmRemote && wallArmRemote[side]);
   const i = merlinIdx(side);
   if (i < 0) return false;
   const b = bodies[i];
   if (!b.alive || b.out) return false;
-  const p = wallUsePos[side];
-  return !p || Math.hypot(b.x - p.x, b.y - p.y) > 2;
+  if (wallPlacedTurn[side]) return false; // un seul mur par tour
+  const p = merlinTurnPos[side];
+  return !!p && (Math.hypot(b.x - p.x, b.y - p.y) > 2);
 }
 function placeWall(side, x1, y1, x2, y2) {
   const dx = x2 - x1, dy = y2 - y1;
@@ -1093,7 +1109,7 @@ function placeWall(side, x1, y1, x2, y2) {
   };
   walls[side] = w;
   const mi = merlinIdx(side);
-  if (mi >= 0) wallUsePos[side] = { x: bodies[mi].x, y: bodies[mi].y };
+  wallPlacedTurn[side] = true; // un seul mur par tour
   wallAim = false;
   burst(mx, my, [side === 1 ? "#ff6b6b" : "#5b9bd4", "#6b4fa0", "#fff"], 24, 4);
   sndTrig();
@@ -1128,7 +1144,7 @@ function startDraft() {
   }
   armTimer(0);
   drag = null; wallAim = false;
-  walls = { 1: null, 2: null }; wallUsePos = { 1: null, 2: null };
+  walls = { 1: null, 2: null }; merlinTurnPos = { 1: null, 2: null }; wallPlacedTurn = { 1: false, 2: false }; wallAim = false;
   scores = [0, 0]; turn = 1; actPlayer = 1;
   freshTurnInfo();
   hide("synfoPanel"); hide("trigPanel"); hide("revivePanel"); hide("winOverlay"); hide("cyrilouPanel"); hide("mizPanel");
@@ -1425,7 +1441,8 @@ function pointerUp(e) {
     const x1 = drag.x1, y1 = drag.y1, x2 = drag.x2, y2 = drag.y2;
     drag = null;
     if (Math.hypot(x2 - x1, y2 - y1) < 10) { setStatus("❌ Mur trop court — recommence."); return; }
-    if (!wallArmed(side)) { setStatus("❌ Merlinpinpin doit d'abord être déplacé pour replacer son mur."); return; }
+    if (!wallArmed(side)) { setStatus("❌ Merlinpinpin doit avoir bougé pendant CE tour (pichenette ou poussée d'un allié) — un seul mur par tour."); return; }
+    if (mode === "guest") { sendMsg({ t: "wall", x1, y1, x2, y2 }); return; } // l'hôte fait autorité et rediffuse l'état
     placeWall(side, x1, y1, x2, y2);
     return;
   }
@@ -2283,7 +2300,7 @@ function broadcastState() {
       pickIn: (phase === "draft" && snake && pickDeadline) ? Math.max(0, pickDeadline - Date.now()) : 0,
       snake: snake, snT: snakeTurn, snPool: snakePool, snFirst: firstPick,
       drafts: snake ? { 1: drafts[1], 2: drafts[2] } : { 1: draftReady[1] ? drafts[1] : null, 2: draftReady[2] ? drafts[2] : null },
-      draftReady, walls, bf: bonusFlicks,
+      draftReady, walls, wallArm: { 1: wallArmed(1), 2: wallArmed(2) }, bf: bonusFlicks,
       mizCands: (phase === "mizterio_pick") ? mizCands : [],
       viewers: vnames.length, vnames: vnames,
       names: specNames
@@ -2315,6 +2332,8 @@ function onMsg(m) {
     }
   } else if (m.t === "draft_pick" && mode === "host") {
     if (phase === "draft" && snake && snakeTurn === 2 && typeof m.char === "string") draftPick(2, m.char);
+  } else if (m.t === "wall" && mode === "host") {
+    if (phase === "aim" && turn === 2 && wallArmed(2)) placeWall(2, m.x1, m.y1, m.x2, m.y2);
   } else if (m.t === "setup_done" && mode === "host") {
     if (phase === "setup" && Array.isArray(m.pos) && m.pos.length === 4) {
       for (let i = 0; i < 4; i++) {
@@ -2335,6 +2354,7 @@ function onMsg(m) {
     if (m.turnInfo) turnInfo = m.turnInfo;
     if (m.trigOpts) trigOpts = m.trigOpts;
     if (m.walls) walls = m.walls;
+    if (m.wallArm) wallArmRemote = m.wallArm;
     if (m.bf) bonusFlicks = m.bf;
     if (m.drafts) { if (m.drafts[1]) { drafts[1] = m.drafts[1]; if (snake || drafts[1].length >= 4) draftReady[1] = true; } if (m.drafts[2]) { drafts[2] = m.drafts[2]; if (snake || drafts[2].length >= 4) draftReady[2] = true; } }
     if (m.snake !== undefined) snake = !!m.snake;
@@ -2497,7 +2517,7 @@ const CHAR_INFO = {
   benp: "Si le ballon le touche (même pendant le tour adverse), à la fin de la course du ballon son camp obtient un tir gratuit depuis la position du ballon.",
   synfo: "Si le ballon la touche, à la fin de la course : laisser le ballon OU passe : choisis l'allié puis oriente librement le ballon autour de lui. Combo : une passe à BenP déclenche son tir gratuit !",
   leure: "Chaque allié qu'il touche pendant sa course gagne immédiatement +1 pichenette (utilisable dans le même tour). Les bonus non utilisés sont perdus à la fin du tour.",
-  merlin: "Immobile : ni un jeton adverse ni le ballon ne peuvent le déplacer (ils rebondissent). Barre ESPACE (ou bouton 🧱) : place son mur unique (l'ancien disparaît), qui fait rebondir tout. Utilisable uniquement s'il a bougé depuis la dernière utilisation (pichenetté ou poussé par un allié). Sensible à Wun.",
+  merlin: "Immobile : ni un jeton adverse ni le ballon ne peuvent le déplacer (ils rebondissent). Barre ESPACE (ou bouton 🧱) : place son mur (l'ancien disparaît), qui fait rebondir tout. Un seul mur par tour, uniquement s'il a bougé pendant CE tour (pichenetté ou poussé par un allié) — armement non utilisé = perdu en fin de tour. Le mur reste en place jusqu'à son remplacement. Sensible à Wun.",
   cyrilou: "Si le ballon le touche : laisser le ballon OU tirer — le ballon vient à lui, tu l'oriente autour de lui puis tires avec une puissance ×2. Ce tir ne peut PAS marquer (les buts rebondissent) et ne déclenche aucune autre capacité. Combo : une passe à Cyrilou déclenche son tir !",
   mizterio: "À la fin de la course, s'il a touché un (ou plusieurs) ennemi(s) — même en défense — il peut échanger la position de l'ennemi de son choix avec celle de n'importe quel autre jeton du plateau (mort autorisé, sorti exclu)."
 };
@@ -2541,6 +2561,7 @@ function startSetup() {
 }
 function beginPlay() {
   phase = "aim"; actPlayer = turn;
+  freshTurnInfo(); // capture les positions post-placement : Merlin doit bouger PENDANT le tour pour armer son mur
   armTimer(30000);
   $("setupBtn").style.display = "none";
   updateBar(); broadcastState();
@@ -2572,7 +2593,7 @@ function backMenu() {
   hide("specLobby"); hide("chatPanel"); hide("specPill"); hide("namesPill"); hide("timerPill"); hide("eloPill");
   $("chatBtn").classList.add("hidden"); chatOpen = false; chatUnread = 0; $("chatBadge").classList.add("hidden");
   fx = [];
-  walls = { 1: null, 2: null }; wallUsePos = { 1: null, 2: null }; wallAim = false;
+  walls = { 1: null, 2: null }; merlinTurnPos = { 1: null, 2: null }; wallPlacedTurn = { 1: false, 2: false }; wallAim = false; wallArmRemote = null;
   draftReady = { 1: false, 2: false }; draftSel = []; draftDeadline = 0;
   snake = false; snakeTurn = 1; snakePool = []; pickDeadline = 0; firstPick = 1;
 }
@@ -2638,7 +2659,7 @@ $("btnWall").onclick = () => { toggleWallAim(); };
 function toggleWallAim() {
   const side = mode === "local" ? turn : mySide;
   if (phase !== "aim" || mode === "spectator") return;
-  if (!wallArmed(side)) { setStatus("🧱 Merlinpinpin doit d'abord être déplacé (par lui-même ou poussé par un allié) pour replacer son mur."); sndUi(); return; }
+  if (!wallArmed(side)) { setStatus("🧱 Merlinpinpin doit avoir bougé pendant CE tour (pichenetté ou poussé par un allié) — un seul mur par tour, armement non utilisé = perdu en fin de tour."); sndUi(); return; }
   wallAim = !wallAim;
   setStatus(wallAim ? "🧱 Trace ton mur : clic-glissé d'un point à un autre (clic droit pour annuler)." : "🧱 Placement du mur annulé.");
   sndUi();
@@ -2714,6 +2735,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="7Z73G3pE6XqazY2qp3mLeg==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="l/28+SMhlJmI1+eGTfLXAg==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
