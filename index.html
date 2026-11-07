@@ -111,7 +111,7 @@
 <div class="overlay" id="menu">
   <div class="card">
     <h1>🏑 <span class="accent">Pichenette</span></h1>
-    <div class="sub">Duel de pichenettes tour par tour — 2 joueurs ou contre l'IA, 4 personnages à capacités.</div>
+    <div class="sub">Duel de pichenettes tour par tour — classé, ami ou contre l'IA. <b>v4</b> <span style="opacity:.65">(si vous ne voyez pas « v4 » ici, faites Ctrl+F5 pour mettre à jour !)</span></div>
     <button class="btn primary" id="btnLocal">👥 2 joueurs — même écran</button>
     <button class="btn" id="btnAI">🤖 Jouer contre l'IA</button>
     <button class="btn" id="btnRanked">🏆 Partie classée — queue & Elo</button>
@@ -227,7 +227,7 @@
   <p id="charPanelDesc"></p>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.2/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.2/dist/mqtt.min.js" onerror="var s=document.createElement('script');s.src='https://unpkg.com/mqtt@5.10.2/dist/mqtt.min.js';s.onerror=function(){var s2=document.createElement('script');s2.src='https://cdn.jsdelivr.net/npm/mqtt@5.10.4/dist/mqtt.min.js';document.head.appendChild(s2);};document.head.appendChild(s);"></script>
 <script>
 "use strict";
 // ================================================================
@@ -707,7 +707,7 @@ function pointerUp(e) {
   const kind = drag.kind;
   if (kind === "setup") {
     if (Math.hypot(drag.px - b.x, drag.py - b.y) < 5 && b.char) { showCharPanel(b.char); drag = null; return; }
-    if (validSpot(b, drag.px, drag.py, false)) { b.x = drag.px; b.y = drag.py; setStatus("Position ok — valide quand tu es prêt."); }
+    if (validSpot(b, drag.px, drag.py, false)) { b.x = drag.px; b.y = drag.py; setStatus("Position ok — valide quand tu es prêt."); if (mode === "host" && netUp) broadcastState(); }
     else setStatus("❌ Position invalide (moitié adverse, chevauchement ou but) — non déplacé.");
     drag = null; return;
   }
@@ -970,6 +970,16 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
+// Diffusion réseau découplée du rendu : fonctionne même onglet en arrière-plan
+// (rAF est gelé par le navigateur quand l'onglet n'est pas visible, setInterval continue).
+let lastBeat = 0;
+setInterval(() => {
+  if (mode !== "host" || !netUp) return;
+  if (phase === "moving") broadcastState();               // ~10 Hz pendant le mouvement
+  else if (Date.now() - lastBeat > 1200) { lastBeat = Date.now(); broadcastState(); } // heartbeat toutes phases
+}, 100);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && mode === "host" && netUp) broadcastState(); });
+
 // ---------- IA ----------
 function scheduleAI() {
   if (mode === "ai" && turn === 2 && phase === "aim") {
@@ -1128,7 +1138,7 @@ function mqConnect() {
         if (!netUp) {
           cleanupNet();
           $("btnDoJoin").disabled = false; $("btnDoJoin").textContent = "Rejoindre";
-          alert("Partie introuvable — vérifie le code et que l'hôte ait bien créé sa partie.");
+          alert("Partie introuvable. Vérifie le code ET que vous avez TOUS LES DEUX la dernière version (le menu doit afficher « v4 » — sinon Ctrl+F5). Attends aussi que l'hôte voie bien son code affiché.");
         }
       }, 12000);
     }
@@ -1145,6 +1155,7 @@ function mqConnect() {
     }
     if (netRole === "guest" && m.t === "welcome") {
       if (m.name) oppProfile = { name: m.name, elo: m.elo || ELO_START };
+      if (m.terr && TERRAINS[m.terr]) { terrain = m.terr; refreshTerrainBtns(); }
       $("btnDoJoin").disabled = false; $("btnDoJoin").textContent = "Rejoindre";
       if (!netUp) { netUp = true; clearTimeout(joinTmr); clearInterval(helloTmr); hide("joinLobby"); startGame("guest", 2); }
       return;
@@ -1214,16 +1225,22 @@ function onMsg(m) {
       if (setupReady[1]) beginPlay();
     }
   } else if (m.t === "state" && mode === "guest") {
+    // pendant le placement : conserver les 4 jetons de l'invité (sinon le heartbeat de l'hôte les écraserait)
+    let mine = null;
+    if (m.phase === "setup" && bodies.length >= 8) mine = bodies.slice(4, 8).map(b => ({ x: b.x, y: b.y, out: b.out }));
     bodies = m.bodies; scores = m.scores; turn = m.turn; actPlayer = m.actPlayer || m.turn;
     goalScorer = m.goalScorer;
     if (m.turnInfo) turnInfo = m.turnInfo;
     if (m.terrain && TERRAINS[m.terrain]) terrain = m.terrain;
     const prevPhase = phase;
     phase = m.phase;
+    if (mine && m.phase === "setup") for (let i = 0; i < 4; i++) if (bodies[4 + i]) { bodies[4 + i].x = mine[i].x; bodies[4 + i].y = mine[i].y; bodies[4 + i].out = mine[i].out; }
     if (phase === "setup") {
       const btn = $("setupBtn");
-      btn.style.display = "block"; btn.disabled = false;
-      btn.textContent = "✅ Mes positions sont prêtes";
+      btn.style.display = "block";
+      const already = !!(m.setupReady && m.setupReady[2]);
+      btn.disabled = already;
+      btn.textContent = already ? "✅ Prêt — en attente de l'hôte…" : "✅ Mes positions sont prêtes";
     } else $("setupBtn").style.display = "none";
     if (phase === "synfo_choice" && isActingPlayer() && prevPhase !== "synfo_choice") showSynfoPanel();
     if (m.phase === "over" && prevPhase !== "over") endGame(m.goalScorer);
@@ -1249,7 +1266,7 @@ function getProfile() { return loadProfile() || { name: "", elo: ELO_START, w: 0
 function saveProfile(p) { try { localStorage.setItem("pichn_profile", JSON.stringify(p)); } catch (e) {} }
 function expectedElo(a, b) { return 1 / (1 + Math.pow(10, (b - a) / 400)); }
 function helloMsg() { const p = getProfile(); return { t: "hello", name: p.name || "Anonyme", elo: p.elo }; }
-function welcomeMsg() { const p = getProfile(); return { t: "welcome", name: p.name || "Anonyme", elo: p.elo }; }
+function welcomeMsg() { const p = getProfile(); return { t: "welcome", name: p.name || "Anonyme", elo: p.elo, terr: terrain }; }
 function pubLadder(e) { try { if (mq && mq.connected) mq.publish("pichn/ladder/" + e.name, JSON.stringify({ n: e.name, e: e.elo, w: e.w || 0, l: e.l || 0, ts: Date.now() }), { qos: 0, retain: true }); } catch (err) {} }
 function settleElo(hostWon) {
   const me = getProfile(); const opp = oppProfile || { name: "Anonyme", elo: ELO_START };
@@ -1289,11 +1306,12 @@ function startQueue() {
         refreshTerrainBtns();
         $("queueState").textContent = "⚔️ Adversaire trouvé : " + m.name + " (" + m.elo + ") — terrain : " + TERRAINS[terrain].emoji + " " + TERRAINS[terrain].name + " !";
         const code = randCode();
-        for (let i = 0; i < 4; i++) setTimeout(() => { try { queueMq.publish("pichn/queue", JSON.stringify({ t: "invite", to: m.id, code, name: getProfile().name, elo: getProfile().elo })); } catch (e) {} }, i * 300);
+        for (let i = 0; i < 4; i++) setTimeout(() => { try { queueMq.publish("pichn/queue", JSON.stringify({ t: "invite", to: m.id, code, name: getProfile().name, elo: getProfile().elo, terr: terrain })); } catch (e) {} }, i * 300);
         setTimeout(() => { stopQueue(true); hide("queuePanel"); startHost({ code, ranked: true, opp: { name: m.name, elo: m.elo } }); }, 1600);
       }
     } else if (m.t === "invite" && m.to === myQid) {
-      $("queueState").textContent = "⚔️ Adversaire trouvé : " + (m.name || "?") + " (" + (m.elo || ELO_START) + ") — terrain annoncé par l'hôte…";
+      if (m.terr && TERRAINS[m.terr]) { terrain = m.terr; refreshTerrainBtns(); }
+      $("queueState").textContent = "⚔️ Adversaire trouvé : " + (m.name || "?") + " (" + (m.elo || ELO_START) + ") — terrain : " + TERRAINS[terrain].emoji + " " + TERRAINS[terrain].name + " !";
       const invite = m;
       setTimeout(() => { stopQueue(true); hide("queuePanel"); doJoin(invite.code, { name: invite.name, elo: invite.elo || ELO_START }); }, 1300);
     }
@@ -1490,6 +1508,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="kAtgSMwvOT4C6I7yX9nPvQ==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="w4KkVvh9hCgUk24Zby+5eQ==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
