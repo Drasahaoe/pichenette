@@ -504,7 +504,10 @@ function canFlick(idx) {
   const b = bodies[idx];
   if (!b || b.type !== "token" || !b.alive || b.out) return false;
   if (phase !== "aim") return false;
-  const mine = mode === "local" ? b.owner === turn : (b.owner === mySide && b.owner === turn);
+  // mode "ai" : le critère est le camp qui joue — l'IA (camp 2) doit pouvoir pichenetter ses jetons.
+  // (Avant : b.owner === mySide rendait canFlick toujours false pour l'IA → aiPlay n'avait aucun
+  // candidat et passait son tour au lieu de jouer.)
+  const mine = (mode === "local" || mode === "ai") ? b.owner === turn : (b.owner === mySide && b.owner === turn);
   if (!mine) return false;
   return !turnInfo.baseUsed || turnInfo.drasahExtra || (bonusFlicks[idx] || 0) > 0;
 }
@@ -1367,7 +1370,7 @@ function pointerDown(e) {
   } else if (phase === "setup") {
     idx = tokenAt(p, (b) => mode === "local" || (mode !== null && b.owner === mySide));
     if (idx >= 0) drag = { kind: "setup", idx, x: p.x, y: p.y, px: bodies[idx].x, py: bodies[idx].y };
-  } else if (phase === "aim") {
+  } else if (phase === "aim" && isActingPlayer()) {
     idx = ownTokenAt(p);
     if (idx >= 0) drag = { kind: "token", idx, x: p.x, y: p.y };
   } else if (phase === "benshot" && isActingPlayer()) {
@@ -2735,6 +2738,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="l/28+SMhlJmI1+eGTfLXAg==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="iffW1hSi+PR/RERWWkNFkA==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
