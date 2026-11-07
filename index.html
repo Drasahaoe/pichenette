@@ -358,7 +358,7 @@ let terrain = "pelouse";
 function friction() { return TERRAINS[terrain].f; }
 function hasWalls() { return !!TERRAINS[terrain].wall; }
 const WALL_REST = 0.72, BODY_REST = 0.92, STOP_V = 0.06;
-const WIN_SCORE = 5;
+const WIN_DIFF = 2; // la partie s'arrête dès 2 buts d'écart
 const CHARS = ["drasah", "wun", "benp", "synfo", "leure", "merlin", "cyrilou", "mizterio"]; // roster v8
 const CHAR_NAMES = { drasah: "Drasah", wun: "Wun", benp: "BenP", synfo: "Synfo", leure: "Leureduthé", merlin: "Merlinpinpin", cyrilou: "Cyriloulefilou", mizterio: "Mizterio" };
 const CHAR_COLORS = { leure: "#d4a017", merlin: "#6b4fa0", cyrilou: "#1f8a70", mizterio: "#8a2be2" };
@@ -381,6 +381,8 @@ fitCanvas();
 let bodies = [];           // 0..3 jetons rouges, 4..7 bleus, 8 ballon
 let scores = [0, 0];
 let turn = 1;              // joueur qui a la main (pichenette)
+let firstTurn = 1;         // camp qui commence la manche en cours (1re rencontre : aléatoire)
+let lastStarter = 0;       // camp qui a commencé la manche précédente (revanche : l'autre commence)
 let actPlayer = 1;         // joueur qui agit maintenant (flick, tir gratuit, choix Synfo)
 let phase = "setup";       // setup | aim | moving | benshot | synfo_choice | synfo_pick | synfo_orient | triggerchoice | revive_pick | goal | over
 let mode = null;           // local | host | guest | ai
@@ -723,7 +725,7 @@ function onGoal(scorer) {
   burst(gx, GOAL_L.y, ["#ffd166", "#ff6b6b", "#5b9bd4", "#fff", "#7ee89a"], 60, 5);
   sndGoal();
   hide("synfoPanel");
-  if (scores[scorer - 1] >= WIN_SCORE) { phase = "over"; endGame(scorer); }
+  if (Math.abs(scores[0] - scores[1]) >= WIN_DIFF) { phase = "over"; endGame(scorer); }
   updateBar(); broadcastState();
 }
 // ---------- Résolution des triggers ----------
@@ -1147,10 +1149,10 @@ function startDraft() {
   armTimer(0);
   drag = null; wallAim = false;
   walls = { 1: null, 2: null }; merlinTurnPos = { 1: null, 2: null }; wallPlacedTurn = { 1: false, 2: false }; wallAim = false;
-  scores = [0, 0]; turn = 1; actPlayer = 1;
-  freshTurnInfo();
-  hide("synfoPanel"); hide("trigPanel"); hide("revivePanel"); hide("winOverlay"); hide("cyrilouPanel"); hide("mizPanel");
-  buildDraftUI();
+  scores = [0, 0];
+  // Engagement : 1re rencontre → aléatoire ; revanche → l'autre camp commence. L'hôte décide, l'invité suit via l'état.
+  if (mode !== "guest") { firstTurn = lastStarter ? 3 - lastStarter : (Math.random() < 0.5 ? 1 : 2); }
+  turn = firstTurn; actPlayer = turn;
   updateBar(); broadcastState();
 }
 function draftActorSide() {
@@ -1808,6 +1810,9 @@ const ACTION_PHASES = ["aim", "benshot", "synfo_choice", "synfo_pick", "synfo_or
 function onActionTimeout() {
   drag = null; wallAim = false;
   armTimer(0);
+  // Le joueur qui laisse son temps expirer perd ses coups en attente (rejoue Drasah, bonus Leure).
+  // Sinon endTurn() les lui ré-arme à l'infini et l'adversaire ne peut plus jamais jouer (gel de partie).
+  if (actPlayer === turn) { turnInfo.drasahExtra = false; bonusFlicks = {}; }
   if (phase === "aim") { flash("⏰ Temps écoulé — tour passé !"); endTurn(); }
   else if (phase === "benshot") { flash("⏰ Temps écoulé — tir gratuit perdu !"); passTarget = -1; hide("synfoPanel"); endTurn(); }
   else if (phase === "synfo_choice") { flash("⏰ Temps écoulé — effet perdu !"); applyAct("synfo_stay", {}); }
@@ -2308,7 +2313,7 @@ function broadcastState() {
   if (mode === "host") {
     const vnames = Object.keys(viewers);
     sendMsg({
-      t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady, terrain, trigOpts,
+      t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady, terrain, trigOpts, firstTurn,
       dlIn: actionDeadline ? Math.max(0, actionDeadline - Date.now()) : 0,
       setupIn: (phase === "setup" && setupDeadline) ? Math.max(0, setupDeadline - Date.now()) : 0,
       draftIn: (phase === "draft" && !snake && draftDeadline) ? Math.max(0, draftDeadline - Date.now()) : 0,
@@ -2366,6 +2371,9 @@ function onMsg(m) {
     if (mode === "guest" && m.phase === "setup" && bodies.length >= 8) mine = bodies.slice(4, 8).map(b => ({ x: b.x, y: b.y, out: b.out }));
     bodies = m.bodies; scores = m.scores; turn = m.turn; actPlayer = m.actPlayer || m.turn;
     goalScorer = m.goalScorer;
+    if (m.firstTurn !== undefined) firstTurn = m.firstTurn; // engagement décidé par l'hôte
+    // nettoyage local : un drag résiduel de l'invité ne doit jamais bloquer la fenêtre de pichenette suivante
+    if (mode === "guest" && (m.phase !== "aim" || (m.actPlayer || m.turn) !== mySide)) { drag = null; wallAim = false; }
     if (m.turnInfo) turnInfo = m.turnInfo;
     if (m.trigOpts) trigOpts = m.trigOpts;
     if (m.walls) walls = m.walls;
@@ -2561,7 +2569,7 @@ function startGame(m, side) {
   if (mode === "host") broadcastState();
 }
 function startSetup() {
-  scores = [0, 0]; turn = 1; actPlayer = 1; phase = "setup"; drag = null;
+  scores = [0, 0]; turn = firstTurn; actPlayer = turn; phase = "setup"; drag = null;
   setupDeadline = Date.now() + 60000;
   armTimer(0);
   benpToken = -1; synfoToken = -1; passTarget = -1;
@@ -2591,6 +2599,7 @@ function saveSideSetup(side) {
 }
 function endGame(winner) {
   phase = "over";
+  lastStarter = firstTurn; // la revanche : l'autre camp commencera
   $("winText").textContent = winner === 1 ? "🏆 Rouge gagne !" : "🏆 Bleu gagne !";
   show("winOverlay"); updateBar(); sndWin();
   if (mode === "host") broadcastState();
@@ -2611,6 +2620,7 @@ function backMenu() {
   walls = { 1: null, 2: null }; merlinTurnPos = { 1: null, 2: null }; wallPlacedTurn = { 1: false, 2: false }; wallAim = false; wallArmRemote = null;
   draftReady = { 1: false, 2: false }; draftSel = []; draftDeadline = 0;
   snake = false; snakeTurn = 1; snakePool = []; pickDeadline = 0; firstPick = 1;
+  firstTurn = 1; lastStarter = 0; // nouvelle rencontre : engagement aléatoire à nouveau
 }
 
 // ---------- Boutons ----------
@@ -2750,6 +2760,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="4Ocz9Pz/93l7UBlD3vMqMw==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="USqJQ+ck8Q4A7HlkW9ghAA==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
