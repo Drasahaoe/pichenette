@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="fr">
 <head>
@@ -91,6 +92,18 @@
   #charPanel p { font-size: 12.5px; line-height: 1.45; opacity: .92; }
   #charPanel .close { position: absolute; top: 6px; right: 8px; background: none; border: none; color: #8fa3c0; font-size: 16px; cursor: pointer; }
   #ladderPanel .card { max-width: 480px; max-height: 80vh; overflow-y: auto; }
+  #charPanel.left { right: auto; left: 14px; }
+  .btnlike { cursor: pointer; user-select: none; }
+  .btnlike:hover { filter: brightness(1.2); }
+  #chatPanel { position: fixed; bottom: 70px; right: 14px; width: 270px; max-height: 260px; z-index: 25; background: #22314a; border: 1px solid #4f7ab0; border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.5); display: flex; flex-direction: column; }
+  #chatLog { overflow-y: auto; padding: 8px 10px; font-size: 12.5px; line-height: 1.4; max-height: 180px; }
+  #chatLog .cname { color: #ffd166; font-weight: 700; }
+  #chatLog .cmsg { color: #dfe8f5; }
+  #chatLog .csys { color: #8fa3c0; font-style: italic; }
+  #chatIn { border: none; border-top: 1px solid #3a4f72; background: #1a2740; color: #dfe8f5; font-size: 13px; padding: 8px 10px; border-radius: 0 0 12px 12px; outline: none; }
+  .badge { display: inline-block; min-width: 16px; padding: 0 4px; margin-left: 4px; border-radius: 8px; background: #ff6b6b; color: #fff; font-size: 11px; font-weight: 700; text-align: center; }
+  #timerPill.low { animation: pulseRed 0.8s infinite; }
+  @keyframes pulseRed { 0%,100% { background: #3a2740; } 50% { background: #7a2b35; } }
 </style>
 </head>
 <body>
@@ -99,7 +112,12 @@
     <span class="pill">🏟️ <span class="score" id="score">0 — 0</span></span>
     <span class="pill" id="turnPill">Tour : Rouge</span>
     <span class="pill terrain" id="terrainPill">🌿 Pelouse</span>
-    <span class="pill elo hidden" id="eloPill"></span>
+    <span class="pill hidden" id="eloPill"></span>
+    <span class="pill hidden" id="namesPill"></span>
+    <span class="pill hidden" id="specPill">👁️ 0</span>
+    <span class="pill hidden" id="timerPill">⏱️ --</span>
+    <span class="pill btnlike" id="muteBtn" title="Sons du jeu">🔊</span>
+    <span class="pill btnlike hidden" id="chatBtn" title="Chat de la partie">💬<span class="badge hidden" id="chatBadge">0</span></span>
     <span id="status"></span>
   </div>
   <div id="gameholder"><canvas id="cv" width="1000" height="600"></canvas></div>
@@ -111,21 +129,22 @@
 <div class="overlay" id="menu">
   <div class="card">
     <h1>🏑 <span class="accent">Pichenette</span></h1>
-    <div class="sub">Duel de pichenettes tour par tour — classé, ami ou contre l'IA. <b>v6</b> <span style="opacity:.65">(si vous ne voyez pas « v6 » ici, faites Ctrl+F5 pour mettre à jour !)</span></div>
+    <div class="sub">Duel de pichenettes tour par tour — classé, ami ou contre l'IA. <b>v7</b> <span style="opacity:.65">(si vous ne voyez pas « v7 » ici, faites Ctrl+F5 pour mettre à jour !)</span></div>
     <button class="btn primary" id="btnLocal">👥 2 joueurs — même écran</button>
     <button class="btn" id="btnAI">🤖 Jouer contre l'IA</button>
     <button class="btn" id="btnRanked">🏆 Partie classée — queue & Elo</button>
     <button class="btn" id="btnLadder">📊 Classement mondial</button>
     <button class="btn" id="btnHost">🌐 Partie amicale — créer (code)</button>
     <button class="btn" id="btnJoin">🔑 Partie amicale — rejoindre (code)</button>
+    <button class="btn" id="btnWatch">👀 Regarder une partie (code) — spectateur</button>
     <div class="sub" style="margin-bottom:4px">🏟️ Terrain de jeu</div>
     <div class="terrains">
       <button class="tbtn" data-terrain="pelouse">🌿 Pelouse<span>glisse normale</span></button>
-      <button class="tbtn" data-terrain="glace">🧊 Glace<span>très glissant</span></button>
+      <button class="tbtn" data-terrain="glace">🧊 Glace<span>très glissant, bordures</span></button>
       <button class="tbtn" data-terrain="terre">🟤 Terre battue<span>ça accroche</span></button>
     </div>
     <div class="rules">
-      <b>But du jeu :</b> propulse le ballon dans le but adverse. Tu ne touches <b>jamais</b> le ballon directement — uniquement tes jetons (fronde : maintiens, tire en arrière, relâche). Premier à <b>5 points</b>. Le but est <b>plus petit que le ballon</b> : vise juste !<br/><b>Pas de bords :</b> ce qui sort du terrain est sorti — le ballon est remis au centre, un jeton éliminé se ressuscite à ton tour (collé à ton but, au prix de ton coup).<br/>
+      <b>But du jeu :</b> propulse le ballon dans le but adverse. Tu ne touches <b>jamais</b> le ballon directement — uniquement tes jetons (fronde : maintiens, tire en arrière, relâche). Premier à <b>5 points</b>. Le but est <b>plus petit que le ballon</b> : vise juste !<br/><b>Pas de bords :</b> ce qui sort du terrain est sorti — le ballon est remis au centre, un jeton éliminé se ressuscite à ton tour (collé à ton but, au prix de ton coup). <b>Exception : sur 🧊 Glace, des bordures renvoient tout dans le terrain — rien ne sort, tout rebondit.</b><br/>
       <b>Personnages</b> (chaque joueur a les 4 mêmes) :
       <div class="ch"><img id="miniDrasah" alt="Drasah"/><span><b>Drasah</b> — peut être joué deux fois de suite : le jouer offre une 2e pichenette immédiate (une fois, pas de chaîne).</span></div>
       <div class="ch"><img id="miniWun" alt="Wun"/><span><b>Wun</b> — retourne tout jeton adverse qu'il touche, <b>à tout moment</b> (jeton mort : ne se joue plus mais bloque). Ranimable uniquement par le contact d'un jeton allié. Deux Wun qui se touchent : celui du joueur qui attaque gagne.</span></div>
@@ -154,6 +173,17 @@
     <input type="text" id="joinCode" maxlength="4" placeholder="CODE" autocomplete="off"/>
     <button class="btn primary" id="btnDoJoin">Rejoindre</button>
     <button class="btn danger" id="btnCancelJoin">Retour</button>
+  </div>
+</div>
+
+<!-- SPECTATE LOBBY -->
+<div class="overlay hidden" id="specLobby">
+  <div class="card">
+    <h2>👀 Regarder une partie</h2>
+    <div class="sub">Entre le code de la partie à observer. Tu verras la partie en direct, sans interagir — parfait pour caster !</div>
+    <input type="text" id="specCode" maxlength="4" placeholder="CODE" autocomplete="off"/>
+    <button class="btn primary" id="btnDoSpec">Regarder</button>
+    <button class="btn danger" id="btnCancelSpec">Retour</button>
   </div>
 </div>
 
@@ -228,7 +258,13 @@
   </div>
 </div>
 
-<!-- CHAR PANEL (fiche personnage, haut droite) -->
+<!-- CHAT -->
+<div id="chatPanel" class="hidden">
+  <div id="chatLog"></div>
+  <input type="text" id="chatIn" maxlength="200" placeholder="Message… (Entrée)" autocomplete="off"/>
+</div>
+
+<!-- CHAR PANEL (fiche personnage, haut droite ou gauche) -->
 <div id="charPanel" class="hidden">
   <button class="close" id="btnCloseChar">✕</button>
   <img id="charPanelImg" alt=""/>
@@ -268,11 +304,12 @@ const GOAL_L = { x: 55, y: H / 2 }, GOAL_RR = { x: W - 55, y: H / 2 };
 const MAX_DRAG = 150, POWER = 0.14;
 const TERRAINS = {
   pelouse: { name: "Pelouse", emoji: "🌿", f: 0.94, c1: "#37884c", c2: "#2e7d43", stripe: "rgba(255,255,255,0.035)", line: "rgba(255,255,255,0.45)", ball: "#f5f0e6", dot: "#333" },
-  glace:   { name: "Glace", emoji: "🧊", f: 0.975, c1: "#d4ebf7", c2: "#a9cfe8", stripe: "rgba(70,110,150,0.06)", line: "rgba(60,90,120,0.55)", ball: "#2b3242", dot: "#f5f0e6" },
+  glace:   { name: "Glace", emoji: "🧊", f: 0.975, wall: true, c1: "#d4ebf7", c2: "#a9cfe8", stripe: "rgba(70,110,150,0.06)", line: "rgba(60,90,120,0.55)", ball: "#2b3242", dot: "#f5f0e6" },
   terre:   { name: "Terre battue", emoji: "🟤", f: 0.90, c1: "#b3814e", c2: "#8f5f30", stripe: "rgba(255,240,220,0.05)", line: "rgba(255,250,240,0.5)", ball: "#ffffff", dot: "#7a3b12" }
 };
 let terrain = "pelouse";
 function friction() { return TERRAINS[terrain].f; }
+function hasWalls() { return !!TERRAINS[terrain].wall; }
 const WALL_REST = 0.72, BODY_REST = 0.92, STOP_V = 0.06;
 const WIN_SCORE = 5;
 const CHARS = ["drasah", "wun", "benp", "synfo"];
@@ -313,6 +350,16 @@ let setupReady = { 1: false, 2: false };
 const savedSetup = { 1: null, 2: null };
 let simActive = false, simGoal = null;
 let aiTimer = 0;
+// v7 : timers, spectateurs, chat, fx, sons
+let actionDeadline = 0;    // échéance (epoch ms) de la fenêtre d'action en cours — 0 = aucune
+let setupDeadline = 0;     // échéance du placement (60 s)
+let statusUntil = 0;       // un message transitoire (flash) prime sur les prompts jusqu'à cette date
+let lastStateAt = 0;       // dernier état reçu (spectateur : détection flux perdu)
+let specNames = { h: "", g: "" }; // noms des 2 joueurs (côté spectateur)
+let viewers = {};          // pseudo -> dernier signalement (côté hôte)
+let specTmr = null, specName = "Spectateur";
+let chatOpen = false, chatUnread = 0;
+let fx = [];               // particules locales (cosmétique uniquement, jamais diffusées)
 
 function makeBodies() {
   const arr = [];
@@ -343,7 +390,10 @@ const $ = (id) => document.getElementById(id);
 function show(id) { $(id).classList.remove("hidden"); }
 function hide(id) { $(id).classList.add("hidden"); }
 function setStatus(t) { $("status").textContent = t; }
-function flash(t) { if (simActive) return; setStatus(t); }
+// prompt contextuel : n'écrase pas un message transitoire récent (flash)
+function setPrompt(t) { if (Date.now() > statusUntil) $("status").textContent = t; }
+// message transitoire : prime sur les prompts pendant 5 s puis s'efface
+function flash(t) { if (simActive) return; setStatus(t); statusUntil = Date.now() + 5000; }
 function updateBar(bonus) {
   $("score").textContent = scores[0] + " — " + scores[1];
   const pill = $("turnPill");
@@ -396,12 +446,25 @@ function stepPhysics() {
     }
     collideGoals();
     collideBodies();
+    collideWalls();
     checkExits();
     if (checkGoal()) return;
   }
   if (!anyMove) {
     if (simActive) return;
-    if (phase === "moving") processPend();
+    if (phase === "moving" && mode !== "spectator") processPend();
+  }
+}
+// Bordures (terrain Glace uniquement) : tout rebondit, rien ne sort.
+function collideWalls() {
+  if (!hasWalls()) return;
+  const M = 8; // aligné sur le trait de terrain
+  for (const b of bodies) {
+    if (b.out) continue;
+    if (b.x < M + b.r) { b.x = M + b.r; if (b.vx < 0) { sndBounce(b); b.vx = -b.vx * WALL_REST; } }
+    else if (b.x > W - M - b.r) { b.x = W - M - b.r; if (b.vx > 0) { sndBounce(b); b.vx = -b.vx * WALL_REST; } }
+    if (b.y < M + b.r) { b.y = M + b.r; if (b.vy < 0) { sndBounce(b); b.vy = -b.vy * WALL_REST; } }
+    else if (b.y > H - M - b.r) { b.y = H - M - b.r; if (b.vy > 0) { sndBounce(b); b.vy = -b.vy * WALL_REST; } }
   }
 }
 // Le but est solide et fixe : les jetons rebondissent dessus.
@@ -443,6 +506,7 @@ function collideBodies() {
         b.vx += imp / b.m * nx; b.vy += imp / b.m * ny;
       }
       handleContact(a, b);
+      if (dvn < -1.5) sndHit(-dvn);
     }
   }
 }
@@ -450,8 +514,8 @@ function collideBodies() {
 function handleContact(a, b) {
   if (a.type === "token" && b.type === "token") {
     // Ranimer un mort (retourné par Wun) : contact d'un allié vivant
-    if (!a.alive && !a.out && b.alive && !b.out && b.owner === a.owner) { a.alive = true; flash("✨ " + CHAR_NAMES[a.char] + " est ranimé !"); }
-    else if (!b.alive && !b.out && a.alive && !a.out && a.owner === b.owner) { b.alive = true; flash("✨ " + CHAR_NAMES[b.char] + " est ranimé !"); }
+    if (!a.alive && !a.out && b.alive && !b.out && b.owner === a.owner) { a.alive = true; flash("✨ " + CHAR_NAMES[a.char] + " est ranimé !"); burst(a.x, a.y, ["#7ee89a", "#c9f7d5"], 16, 3); sndRevive(); }
+    else if (!b.alive && !b.out && a.alive && !a.out && a.owner === b.owner) { b.alive = true; flash("✨ " + CHAR_NAMES[b.char] + " est ranimé !"); burst(b.x, b.y, ["#7ee89a", "#c9f7d5"], 16, 3); sndRevive(); }
     // Wun retourne tout jeton adverse touché ; duel de Wun : l'attaquant (joueur du tour) gagne
     const aW = a.char === "wun" && a.alive && !a.out;
     const bW = b.char === "wun" && b.alive && !b.out;
@@ -472,9 +536,12 @@ function killToken(b) {
   if (!b.alive || b.out) return;
   b.alive = false;
   flash("⚔️ Wun retourne " + CHAR_NAMES[b.char] + " !");
+  burst(b.x, b.y, ["#2b2b3b", "#4a4a6a", "#111"], 18, 3.5);
+  sndFlip();
 }
-// Pas de bords : ce qui sort est sorti.
+// Pas de bords : ce qui sort est sorti. (Exception : sur Glace, les bordures empêchent toute sortie.)
 function checkExits() {
+  if (hasWalls()) return;
   const ball = bodies[8];
   if (ball.x < 0 || ball.x > W || ball.y < 0 || ball.y > H) {
     ball.x = W / 2; ball.y = H / 2; ball.vx = 0; ball.vy = 0;
@@ -500,6 +567,9 @@ function checkGoal() {
 function onGoal(scorer) {
   phase = "goal"; goalScorer = scorer; goalTimer = 90;
   scores[scorer - 1]++;
+  const gx = scorer === 1 ? GOAL_RR.x : GOAL_L.x;
+  burst(gx, GOAL_L.y, ["#ffd166", "#ff6b6b", "#5b9bd4", "#fff", "#7ee89a"], 60, 5);
+  sndGoal();
   hide("synfoPanel");
   if (scores[scorer - 1] >= WIN_SCORE) { phase = "over"; endGame(scorer); }
   updateBar(); broadcastState();
@@ -529,6 +599,9 @@ function startTrigger(i, isCounter) {
   turnInfo.counter = !!isCounter;
   inResolution = true;
   const team = tok.owner === 1 ? "Rouge" : "Bleu";
+  burst(tok.x, tok.y, tok.owner === 1 ? ["#ff6b6b", "#ffd166"] : ["#5b9bd4", "#ffd166"], 26, 4);
+  if (isCounter) sndCounter(); else sndTrig();
+  armTimer(30000);
   if (tok.char === "benp") {
     phase = "benshot";
     flash(isCounter ? "⚡ CONTRE JEU — BenP " + team + " : tir gratuit !" : "🔵 BenP " + team + " : tir gratuit au ballon, depuis sa position !");
@@ -551,6 +624,7 @@ function startTrigChoice(cands) {
   inResolution = true;
   phase = "triggerchoice";
   flash("🎁 Deux effets touchés — choisis-en un !");
+  armTimer(30000);
   if (isActingPlayer()) showTrigPanel();
   updateBar(); broadcastState();
   if (mode === "ai" && actPlayer === 2) setTimeout(aiTrigChoice, 800);
@@ -585,6 +659,7 @@ function endTurn() {
   if (turnInfo.flickedChar === "drasah" && !turnInfo.bonusActive) {
     turnInfo.bonusActive = true;
     phase = "aim"; actPlayer = turn;
+    armTimer(30000);
     flash("🎁 Drasah : rejoue une 2e pichenette !");
   } else if (deferred.length) {
     const cands = deferred.filter(trigValid);
@@ -596,6 +671,7 @@ function endTurn() {
     turn = turn === 1 ? 2 : 1;
     actPlayer = turn;
     phase = "aim";
+    armTimer(30000);
     freshTurnInfo();
     // extermination : aucun jeton jouable ET aucune ressuscitation possible → défaite immédiate
     if (!hasPlayable(turn) && ownDeadIdx(turn).length === 0) {
@@ -616,6 +692,9 @@ function applyFlick(idx, vx, vy) {
   pendIdx = -1; pendArmer = turn; inResolution = false;
   actPlayer = turn;
   phase = "moving";
+  armTimer(0);
+  burst(b.x, b.y, ["#ffffff", "#ffd166"], 7, 2.5);
+  sndFlick();
   setStatus("💨 Pichenette de " + CHAR_NAMES[b.char] + " !");
   updateBar(turnInfo.bonusActive); broadcastState();
 }
@@ -672,6 +751,7 @@ function startSynfoOrient(idx) {
   ball.vx = 0; ball.vy = 0;
   ball.x = tgt.x + dx / dd * R; ball.y = tgt.y + dy / dd * R;
   phase = "synfo_orient";
+  armTimer(30000);
   setStatus("🎯 Oriente le ballon autour de " + CHAR_NAMES[tgt.char] + " (glisse-le sur le cercle) puis relâche.");
   updateBar(); broadcastState();
   if (mode === "ai" && actPlayer === 2) setTimeout(aiSynfoOrient, 600);
@@ -789,7 +869,7 @@ function pointerUp(e) {
   const b = bodies[drag.idx];
   const kind = drag.kind;
   if (kind === "setup") {
-    if (Math.hypot(drag.px - b.x, drag.py - b.y) < 5 && b.char) { showCharPanel(b.char); drag = null; return; }
+    if (Math.hypot(drag.px - b.x, drag.py - b.y) < 5 && b.char) { showCharPanel(b.char, b.owner); drag = null; return; }
     if (validSpot(b, drag.px, drag.py, false)) { b.x = drag.px; b.y = drag.py; setStatus("Position ok — valide quand tu es prêt."); if (mode === "host" && netUp) broadcastState(); }
     else setStatus("❌ Position invalide (moitié adverse, chevauchement ou but) — non déplacé.");
     drag = null; return;
@@ -806,16 +886,16 @@ function pointerUp(e) {
   }
   const dx = b.x - drag.x, dy = b.y - drag.y;
   const d = Math.hypot(dx, dy);
-  if (d < 8) { if (kind === "token" && b.char) showCharPanel(b.char); drag = null; return; }
+  if (d < 8) { if (kind === "token" && b.char) showCharPanel(b.char, b.owner); drag = null; return; }
   const vx = dx * POWER, vy = dy * POWER;
   const idx = drag.idx; drag = null;
   if (kind === "token") {
     if (mode === "guest") {
       sendMsg({ t: "flick", idx, vx, vy });
-      b.vx = vx; b.vy = vy; phase = "moving"; pendIdx = -1; pendArmer = turn; updateBar();
+      b.vx = vx; b.vy = vy; phase = "moving"; pendIdx = -1; pendArmer = turn; armTimer(0); burst(b.x, b.y, ["#ffffff", "#ffd166"], 7, 2.5); sndFlick(); updateBar();
     } else applyFlick(idx, vx, vy);
   } else if (kind === "ballaim") {
-    if (mode === "guest") { sendMsg({ t: "act", kind: "benp_shot", vx, vy }); b.vx = vx; b.vy = vy; phase = "moving"; pendIdx = -1; pendArmer = actPlayer; }
+    if (mode === "guest") { sendMsg({ t: "act", kind: "benp_shot", vx, vy }); b.vx = vx; b.vy = vy; phase = "moving"; pendIdx = -1; pendArmer = actPlayer; armTimer(0); burst(b.x, b.y, ["#ffd166"], 7, 2.5); sndFlick(); }
     else applyAct("benp_shot", { vx, vy });
   }
 }
@@ -824,6 +904,11 @@ cv.addEventListener("pointermove", pointerMove);
 cv.addEventListener("pointerup", pointerUp);
 cv.addEventListener("pointercancel", pointerUp);
 cv.addEventListener("lostpointercapture", pointerUp);
+// Clic droit : annule l'engagement en cours (drag de tir, visée BenP, orientation Synfo) sans jouer le coup.
+cv.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  if (drag) { drag = null; setPrompt("↩️ Coup annulé — reprends quand tu veux."); sndUi(); }
+});
 
 // ---------- Rendu ----------
 function draw() {
@@ -844,6 +929,14 @@ function draw() {
   }
   ctx.strokeStyle = T.line; ctx.lineWidth = 3;
   ctx.strokeRect(8, 8, W - 16, H - 16);
+  if (hasWalls()) { // bordures visibles sur la glace
+    ctx.save();
+    ctx.strokeStyle = "rgba(225,242,255,0.95)"; ctx.lineWidth = 9;
+    ctx.strokeRect(5, 5, W - 10, H - 10);
+    ctx.strokeStyle = "rgba(140,180,220,0.6)"; ctx.lineWidth = 2;
+    ctx.strokeRect(11, 11, W - 22, H - 22);
+    ctx.restore();
+  }
   ctx.beginPath(); ctx.moveTo(W / 2, 8); ctx.lineTo(W / 2, H - 8); ctx.stroke();
   ctx.beginPath(); ctx.arc(W / 2, H / 2, 70, 0, Math.PI * 2); ctx.stroke();
   drawGoal(GOAL_L, "#ff6b6b");
@@ -889,8 +982,9 @@ function draw() {
     let banner = null;
     if (mode === "local") banner = turn === 1 ? "🔴 AU TOUR DE ROUGE" : "🔵 AU TOUR DE BLEU";
     else if (mode === "ai") banner = turn === 1 ? "👉 À TOI DE JOUER" : "🤖 L'IA réfléchit…";
+    else if (mode === "spectator") banner = turn === 1 ? "🔴 AU TOUR DE ROUGE" : "🔵 AU TOUR DE BLEU";
     else banner = turn === mySide ? "👉 À TOI DE JOUER" : "⏳ Tour de l'adversaire…";
-    const mine = mode === "local" ? true : (mode === "ai" ? turn === 1 : turn === mySide);
+    const mine = mode === "local" ? true : (mode === "ai" ? turn === 1 : (mode === "spectator" ? false : turn === mySide));
     if (banner) drawBanner(banner, mine);
   }
   if (phase === "benshot") {
@@ -913,18 +1007,34 @@ function draw() {
   const rev = $("reviveBtn");
   if (phase === "aim" && isActingPlayer() && ownDeadIdx(turn).length > 0) rev.style.display = "block";
   else rev.style.display = "none";
-  // messages contextuels
-  if (phase === "setup") {
-    const who = mode === "local" ? "chaque joueur place ses jetons dans sa moitié" : (mode === "ai" ? "place tes jetons dans ta moitié — l'IA place aussi" : "glisse tes jetons dans ta moitié de terrain");
-    setStatus("🧩 Placement : " + who + " (pas de chevauchement, hors but) puis valide en bas.");
+  // messages contextuels (prompts : n'écrasent pas un flash récent)
+  if (mode === "spectator" && netUp && Date.now() - lastStateAt > 10000) setStatus("⚠️ Flux interrompu — en attente de l'hôte…");
+  else if (phase === "setup") {
+    const who = mode === "local" ? "chaque joueur place ses jetons dans sa moitié" : (mode === "ai" ? "place tes jetons dans ta moitié — l'IA place aussi" : (mode === "spectator" ? "placement en cours…" : "glisse tes jetons dans ta moitié de terrain"));
+    setPrompt("🧩 Placement : " + who + " puis valide en bas.");
   } else if (phase === "aim" && mode) {
     const mine = mode === "local" || turn === mySide || (mode === "ai" && turn === 1);
-    if (mine) setStatus("👉 À TOI DE JOUER — tire en arrière sur un de tes jetons" + (turnInfo.bonusActive ? " — 🎁 pichenette bonus" : "") + (ownDeadIdx(turn).length ? " OU 🩹 ressuscite (bouton en bas à gauche)" : "") + ". Astuce : clique (sans tirer) sur un jeton pour revoir sa fiche.");
-    else if (mode === "ai") setStatus("🤖 L'IA réfléchit…");
-    else setStatus("⏳ Tour de l'adversaire…");
-  } else if (phase === "benshot" && (mode !== "guest" || isActingPlayer())) setStatus(isActingPlayer() ? "🎁 BENP : TIR GRATUIT — À TOI DE JOUER : tire en arrière sur le ballon (cercle jaune) !" : "🎁 BenP offre un tir gratuit à l'adversaire…");
-  else if (phase === "synfo_pick" && (mode !== "guest" || isActingPlayer())) setStatus("🎯 Passe : clique sur le jeton allié qui reçoit le ballon.");
-  else if (phase === "triggerchoice" && (mode !== "guest" || isActingPlayer())) setStatus(isActingPlayer() ? "🎁 Deux effets touchés — choisis-en un (l'autre sera perdu) !" : "⏳ L'adversaire choisit son effet…");
+    if (mine) setPrompt("👉 Tire en arrière sur un de tes jetons" + (turnInfo.bonusActive ? " — 🎁 pichenette bonus" : "") + (ownDeadIdx(turn).length ? " OU 🩹 ressuscite (bouton bas gauche)" : "") + " · clic droit = annuler un drag.");
+    else if (mode === "ai") setPrompt("🤖 L'IA réfléchit…");
+    else setPrompt("⏳ Tour de l'adversaire…");
+  } else if (phase === "benshot" && (mode !== "guest" || isActingPlayer())) setPrompt(isActingPlayer() ? "🎁 BENP : TIR GRATUIT — tire en arrière sur le ballon (cercle jaune) !" : "🎁 BenP offre un tir gratuit à l'adversaire…");
+  else if (phase === "synfo_pick" && (mode !== "guest" || isActingPlayer())) setPrompt("🎯 Passe : clique sur le jeton allié qui reçoit le ballon.");
+  else if (phase === "triggerchoice" && (mode !== "guest" || isActingPlayer())) setPrompt(isActingPlayer() ? "🎁 Deux effets touchés — choisis-en un (l'autre sera perdu) !" : "⏳ L'adversaire choisit son effet…");
+  updateTimerPill();
+  drawFx();
+}
+let lastTickSec = 0;
+function updateTimerPill() {
+  const p = $("timerPill");
+  if (!mode || phase === "over" || phase === "moving" || phase === "goal" || phase === "revive_pick") { p.classList.add("hidden"); return; }
+  const dl = phase === "setup" ? setupDeadline : actionDeadline;
+  if (!dl) { p.classList.add("hidden"); return; }
+  const s = Math.ceil((dl - Date.now()) / 1000);
+  if (s < 0) { p.classList.add("hidden"); return; }
+  p.classList.remove("hidden");
+  p.textContent = (phase === "setup" ? "🧩 " : "⏱️ ") + s + "s";
+  p.classList.toggle("low", s <= 5);
+  if (s <= 5 && s >= 1) { const sec = Math.floor(Date.now() / 1000); if (lastTickSec !== sec) { lastTickSec = sec; sndTick(); } }
 }
 function drawBanner(text, mine) {
   ctx.save();
@@ -1038,11 +1148,96 @@ function drawSling(b, d) {
 }
 function pwColor(p) { return p < .5 ? "#ffd166" : "#ff6b6b"; }
 
+// ---------- v7 : timers autoritaires (hôte / local / IA) ----------
+function armTimer(ms) { actionDeadline = ms > 0 ? Date.now() + ms : 0; }
+const ACTION_PHASES = ["aim", "benshot", "synfo_choice", "synfo_pick", "synfo_orient", "triggerchoice"];
+function onActionTimeout() {
+  drag = null;
+  armTimer(0);
+  if (phase === "aim") { flash("⏰ Temps écoulé — tour passé !"); endTurn(); }
+  else if (phase === "benshot") { flash("⏰ Temps écoulé — tir gratuit perdu !"); passTarget = -1; hide("synfoPanel"); endTurn(); }
+  else if (phase === "synfo_choice") { flash("⏰ Temps écoulé — effet perdu !"); applyAct("synfo_stay", {}); }
+  else if (phase === "synfo_pick" || phase === "synfo_orient") { flash("⏰ Temps écoulé — passe perdue !"); passTarget = -1; hide("synfoPanel"); endTurn(); }
+  else if (phase === "triggerchoice") { flash("⏰ Temps écoulé — effets perdus !"); trigOpts = []; hide("trigPanel"); endTurn(); }
+}
+function onSetupTimeout() {
+  flash("⏰ Placement terminé — la partie commence !");
+  if (mode === "local") { saveSideSetup(1); saveSideSetup(2); }
+  else if (mode === "ai") { saveSideSetup(1); aiSetup(); }
+  else if (mode === "host") { saveSideSetup(1); setupReady[1] = true; }
+  else return;
+  beginPlay();
+}
+// setInterval (pas rAF) : l'expiration s'exécute même onglet en arrière-plan.
+setInterval(() => {
+  if (!mode || mode === "guest" || mode === "spectator") return;
+  const now = Date.now();
+  if (mode === "host") { for (const k in viewers) if (now - viewers[k] > 12000) delete viewers[k]; updateSpecPill(Object.keys(viewers).length, Object.keys(viewers)); }
+  if (phase === "setup" && setupDeadline && now > setupDeadline) { onSetupTimeout(); return; }
+  if (actionDeadline && ACTION_PHASES.indexOf(phase) >= 0 && now > actionDeadline) onActionTimeout();
+}, 250);
+
+// ---------- v7 : sound design (WebAudio 100% synthétisé, aucun fichier) ----------
+let AC = null, muted = false;
+try { muted = localStorage.getItem("pichn_mute") === "1"; } catch (e) {}
+function ac() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (AC.state === "suspended") { try { AC.resume(); } catch (e) {} }
+  return AC;
+}
+document.addEventListener("pointerdown", () => ac(), true);
+function tone(f, d, type, vol, slideTo) {
+  const c = ac(); if (!c || muted) return;
+  try {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type || "sine"; o.frequency.setValueAtTime(f, c.currentTime);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), c.currentTime + d);
+    g.gain.setValueAtTime(vol || 0.12, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + d);
+    o.connect(g); g.connect(c.destination);
+    o.start(); o.stop(c.currentTime + d + 0.02);
+  } catch (e) {}
+}
+let lastSndHit = 0;
+function sndHit(v) { if (Date.now() - lastSndHit < 80) return; lastSndHit = Date.now(); const f = 90 + Math.min(200, v * 12); tone(f, 0.07, "triangle", Math.min(0.2, 0.06 + v * 0.004), f * 0.6); }
+function sndBounce(b) { if (Math.abs(b.vx) + Math.abs(b.vy) < 1.2) return; tone(150 + b.r * 2, 0.06, "square", 0.06, 90); }
+function sndFlick() { tone(420, 0.12, "sawtooth", 0.1, 130); }
+function sndFlip() { tone(180, 0.25, "sawtooth", 0.14, 45); }
+function sndRevive() { tone(520, 0.1, "sine", 0.1, 780); }
+function sndTrig() { tone(660, 0.09, "sine", 0.1); setTimeout(() => tone(880, 0.12, "sine", 0.1), 70); }
+function sndCounter() { tone(90, 0.3, "square", 0.16, 60); setTimeout(() => tone(660, 0.1, "square", 0.09), 120); }
+function sndGoal() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.16, "square", 0.11), i * 110)); }
+function sndWin() { [523, 659, 784, 1046, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.18, "triangle", 0.11), i * 130)); }
+function sndTick() { tone(1250, 0.04, "sine", 0.07); }
+function sndUi() { tone(600, 0.05, "sine", 0.08); }
+function sndChat() { tone(880, 0.07, "sine", 0.08, 1100); }
+
+// ---------- v7 : effets visuels (particules locales, jamais diffusées) ----------
+function burst(x, y, cols, n, sp) {
+  for (let i = 0; i < n; i++) {
+    if (fx.length > 400) fx.shift();
+    const a = Math.random() * Math.PI * 2, s = (0.35 + Math.random() * 0.65) * (sp || 3);
+    fx.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, l: 1, r: 2 + Math.random() * 3.5, c: cols[i % cols.length] });
+  }
+}
+function drawFx() {
+  for (const p of fx) { p.x += p.vx; p.y += p.vy; p.vx *= 0.95; p.vy *= 0.95; p.l -= 0.028; }
+  fx = fx.filter((p) => p.l > 0);
+  if (!fx.length) return;
+  ctx.save();
+  for (const p of fx) {
+    ctx.globalAlpha = Math.max(0, p.l);
+    ctx.fillStyle = p.c;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r * p.l + 1, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
 // ---------- Boucle ----------
 function loop() {
   if (mode) {
-    if (phase === "moving" || (mode !== "guest" && phase === "goal")) stepPhysics();
-    if (phase === "goal") {
+    if (phase === "moving" || (mode !== "guest" && mode !== "spectator" && phase === "goal")) stepPhysics();
+    if (phase === "goal" && mode !== "spectator") {
       goalTimer--;
       if (goalTimer <= 0 && mode !== "guest") {
         resetPositions(); phase = "aim";
@@ -1201,24 +1396,41 @@ function randCode() {
   for (let i = 0; i < 4; i++) s += c[Math.floor(Math.random() * c.length)];
   return s;
 }
-function topics(code) { return { h: "pichn/" + code + "/h", g: "pichn/" + code + "/g" }; }
+function topics(code) { return { h: "pichn/" + code + "/h", g: "pichn/" + code + "/g", v: "pichn/" + code + "/v", c: "pichn/" + code + "/c" }; }
 function cleanupNet() {
-  clearTimeout(joinTmr); clearInterval(helloTmr); clearTimeout(brokerTmr);
+  clearTimeout(joinTmr); clearInterval(helloTmr); clearTimeout(brokerTmr); clearInterval(specTmr); specTmr = null;
   try { if (mq) mq.end(true); } catch (e) {}
   mq = null; netRole = null; netUp = false; roomCode = "";
+  viewers = {}; lastStateAt = 0; specNames = { h: "", g: "" };
+  updateSpecPill(0, []);
 }
 function sendRaw(topic, m) { try { if (mq && mq.connected) mq.publish(topic, JSON.stringify(m)); } catch (e) {} }
 function mqConnect() {
   const T = topics(roomCode);
-  const willTopic = netRole === "host" ? T.h : T.g;
-  mq = mqtt.connect(MQTT_URL, {
-    clientId: "pichn-" + (netRole === "host" ? "h" : "g") + "-" + roomCode.toLowerCase() + "-" + Math.random().toString(36).slice(2, 8),
-    keepalive: 30, clean: true, reconnectPeriod: 3000, connectTimeout: 8000,
-    will: { topic: willTopic, payload: JSON.stringify({ t: "bye" }), qos: 0, retain: false }
-  });
+  const isSpec = netRole === "spec";
+  const roleTag = netRole === "host" ? "h" : (isSpec ? "s" : "g");
+  const opts = {
+    clientId: "pichn-" + roleTag + "-" + roomCode.toLowerCase() + "-" + Math.random().toString(36).slice(2, 8),
+    keepalive: 30, clean: true, reconnectPeriod: 3000, connectTimeout: 8000
+  };
+  if (!isSpec) {
+    const willTopic = netRole === "host" ? T.h : T.g;
+    opts.will = { topic: willTopic, payload: JSON.stringify({ t: "bye" }), qos: 0, retain: false };
+  }
+  mq = mqtt.connect(MQTT_URL, opts);
   mq.on("connect", () => {
     clearTimeout(brokerTmr);
-    mq.subscribe(netRole === "host" ? T.g : T.h, { qos: 0 });
+    if (netRole === "host") { mq.subscribe(T.g, { qos: 0 }); mq.subscribe(T.v, { qos: 0 }); mq.subscribe(T.c, { qos: 0 }); }
+    else if (isSpec) {
+      mq.subscribe(T.h, { qos: 0 }); mq.subscribe(T.c, { qos: 0 });
+      // présence du spectateur : signalement toutes les 4 s sur le topic dédié
+      sendRaw(T.v, { t: "v", name: specName });
+      clearInterval(specTmr);
+      specTmr = setInterval(() => { if (mode === "spectator") sendRaw(T.v, { t: "v", name: specName }); }, 4000);
+    }
+    else {
+      mq.subscribe(T.h, { qos: 0 }); mq.subscribe(T.c, { qos: 0 });
+    }
     if (netRole === "guest") {
       sendRaw(T.g, helloMsg());
       clearInterval(helloTmr);
@@ -1228,7 +1440,18 @@ function mqConnect() {
         if (!netUp) {
           cleanupNet();
           $("btnDoJoin").disabled = false; $("btnDoJoin").textContent = "Rejoindre";
-          alert("Partie introuvable. Vérifie le code ET que vous avez TOUS LES DEUX la dernière version (le menu doit afficher « v6 » — sinon Ctrl+F5). Attends aussi que l'hôte voie bien son code affiché.");
+          alert("Partie introuvable. Vérifie le code ET que vous avez TOUS LES DEUX la dernière version (le menu doit afficher « v7 » — sinon Ctrl+F5). Attends aussi que l'hôte voie bien son code affiché.");
+        }
+      }, 12000);
+    }
+    if (isSpec) {
+      clearTimeout(joinTmr);
+      joinTmr = setTimeout(() => {
+        if (!netUp) {
+          cleanupNet();
+          mode = null;
+          hide("specLobby"); show("menu");
+          alert("Aucune partie en cours avec ce code. Vérifie le code, que la partie est bien créée, et que l'hôte a la dernière version (v7).");
         }
       }, 12000);
     }
@@ -1236,6 +1459,8 @@ function mqConnect() {
   mq.on("message", (topic, payload) => {
     let m = null; try { m = JSON.parse(payload.toString()); } catch (e) { return; }
     if (!m || !m.t) return;
+    if (m.t === "c") { addChat(m.name, m.text); return; }
+    if (m.t === "v" && netRole === "host") { if (m.name) viewers[m.name] = Date.now(); return; }
     if (m.t === "bye") { if (mode) { setStatus("🔌 L'adversaire s'est déconnecté."); phase = "over"; } return; }
     if (netRole === "host" && m.t === "hello") {
       if (m.name) oppProfile = { name: m.name, elo: m.elo || ELO_START };
@@ -1284,6 +1509,72 @@ function doJoin(codeOverride, opp) {
   if (opp) oppProfile = opp;
   mqConnect();
 }
+// ---------- v7 : spectateur ----------
+function startWatch() {
+  if (!netAvailable()) { alert("La bibliothèque réseau n'a pas pu être chargée — vérifie ta connexion internet (ou un bloqueur de publicités) puis recharge la page."); return; }
+  hide("menu"); show("specLobby");
+  $("specCode").value = ""; $("specCode").focus();
+}
+function doSpectate() {
+  const code = ($("specCode").value.trim()).toUpperCase();
+  if (code.length !== 4) { alert("Entre le code à 4 caractères."); return; }
+  $("btnDoSpec").disabled = true; $("btnDoSpec").textContent = "Connexion…";
+  roomCode = code; netRole = "spec"; netUp = false;
+  mode = "spectator"; mySide = 0;
+  const p = getProfile();
+  specName = (p.name || "Spec") + "";
+  setupDeadline = 0; actionDeadline = 0;
+  hide("menu"); hide("winOverlay"); hide("synfoPanel"); hide("trigPanel");
+  $("chatBtn").classList.remove("hidden");
+  mqConnect();
+}
+// ---------- v7 : chat ----------
+function addChat(name, text) {
+  if (!text) return;
+  const log = $("chatLog");
+  const d = document.createElement("div");
+  const sp = document.createElement("span"); sp.className = "cname"; sp.textContent = (name || "?") + " : ";
+  const tx = document.createElement("span"); tx.className = "cmsg"; tx.textContent = String(text).slice(0, 200);
+  d.appendChild(sp); d.appendChild(tx);
+  log.appendChild(d);
+  while (log.children.length > 100) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;
+  sndChat();
+  if (!chatOpen) { chatUnread++; const b = $("chatBadge"); b.textContent = chatUnread; b.classList.remove("hidden"); }
+}
+function sendChat(text) {
+  const t = (text || "").trim().slice(0, 200);
+  if (!t || !mq || !mq.connected) return;
+  sendRaw(topics(roomCode).c, { t: "c", name: specOrMyName(), text: t });
+}
+function specOrMyName() {
+  if (mode === "spectator") return specName;
+  return getProfile().name || "Joueur";
+}
+function toggleChat() {
+  chatOpen = !chatOpen;
+  $("chatPanel").classList.toggle("hidden", !chatOpen);
+  if (chatOpen) { chatUnread = 0; $("chatBadge").classList.add("hidden"); $("chatIn").focus(); }
+}
+// pill spectateurs 👁️ (visible côté joueurs et spectateurs)
+function updateSpecPill(n, names) {
+  const p = $("specPill");
+  if (n > 0) { p.classList.remove("hidden"); p.textContent = "👁️ " + n; p.title = "Spectateurs : " + names.join(", "); }
+  else { p.classList.add("hidden"); p.title = ""; }
+}
+// pill noms des joueurs (affichée en ligne et en spectateur)
+function updateNamesPill() {
+  const p = $("namesPill");
+  if (mode === "spectator") {
+    if (specNames.h || specNames.g) { p.classList.remove("hidden"); p.textContent = "🔴 " + (specNames.h || "Rouge") + " ⚔️ " + (specNames.g || "Bleu") + " 🔵"; }
+    else p.classList.add("hidden");
+  } else if (mode === "host" || mode === "guest") {
+    const me = getProfile().name || (mode === "host" ? "Rouge" : "Bleu");
+    const op = oppProfile ? (oppProfile.name || (mode === "host" ? "Bleu" : "Rouge")) : (mode === "host" ? "Bleu" : "Rouge");
+    if (mode === "host") { specNames = { h: me, g: op }; } else { specNames = { h: op, g: me }; }
+    p.classList.remove("hidden"); p.textContent = "🔴 " + specNames.h + " ⚔️ " + specNames.g + " 🔵";
+  } else p.classList.add("hidden");
+}
 function sendMsg(m) {
   if (!netUp || !mq || !mode) return;
   const T = topics(roomCode);
@@ -1291,7 +1582,14 @@ function sendMsg(m) {
 }
 function broadcastState() {
   if (mode === "host") {
-    sendMsg({ t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady, terrain, trigOpts });
+    const vnames = Object.keys(viewers);
+    sendMsg({
+      t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady, terrain, trigOpts,
+      dlIn: actionDeadline ? Math.max(0, actionDeadline - Date.now()) : 0,
+      setupIn: (phase === "setup" && setupDeadline) ? Math.max(0, setupDeadline - Date.now()) : 0,
+      viewers: vnames.length, vnames: vnames,
+      names: specNames
+    });
   }
 }
 function onMsg(m) {
@@ -1315,27 +1613,41 @@ function onMsg(m) {
       setupReady[2] = true;
       if (setupReady[1]) beginPlay();
     }
-  } else if (m.t === "state" && mode === "guest") {
+  } else if (m.t === "state" && (mode === "guest" || mode === "spectator")) {
+    lastStateAt = Date.now();
     // pendant le placement : conserver les 4 jetons de l'invité (sinon le heartbeat de l'hôte les écraserait)
     let mine = null;
-    if (m.phase === "setup" && bodies.length >= 8) mine = bodies.slice(4, 8).map(b => ({ x: b.x, y: b.y, out: b.out }));
+    if (mode === "guest" && m.phase === "setup" && bodies.length >= 8) mine = bodies.slice(4, 8).map(b => ({ x: b.x, y: b.y, out: b.out }));
     bodies = m.bodies; scores = m.scores; turn = m.turn; actPlayer = m.actPlayer || m.turn;
     goalScorer = m.goalScorer;
     if (m.turnInfo) turnInfo = m.turnInfo;
     if (m.trigOpts) trigOpts = m.trigOpts;
     if (m.terrain && TERRAINS[m.terrain]) terrain = m.terrain;
+    if (m.names) specNames = m.names;
+    if (m.viewers !== undefined) updateSpecPill(m.viewers, m.vnames || []);
+    if (mode === "spectator") { netUp = true; clearTimeout(joinTmr); hide("specLobby"); $("btnDoSpec").disabled = false; $("btnDoSpec").textContent = "Regarder"; updateNamesPill(); }
+    // timers : échéances reçues en ms restants (pas d'epoch → insensible au décalage d'horloge)
+    actionDeadline = m.dlIn ? Date.now() + m.dlIn : 0;
+    setupDeadline = (m.phase === "setup" && m.setupIn) ? Date.now() + m.setupIn : 0;
     const prevPhase = phase;
     phase = m.phase;
     if (mine && m.phase === "setup") for (let i = 0; i < 4; i++) if (bodies[4 + i]) { bodies[4 + i].x = mine[i].x; bodies[4 + i].y = mine[i].y; bodies[4 + i].out = mine[i].out; }
     if (phase === "setup") {
       const btn = $("setupBtn");
-      btn.style.display = "block";
-      const already = !!(m.setupReady && m.setupReady[2]);
-      btn.disabled = already;
-      btn.textContent = already ? "✅ Prêt — en attente de l'hôte…" : "✅ Mes positions sont prêtes";
+      if (mode === "guest") {
+        btn.style.display = "block";
+        const already = !!(m.setupReady && m.setupReady[2]);
+        btn.disabled = already;
+        btn.textContent = already ? "✅ Prêt — en attente de l'hôte…" : "✅ Mes positions sont prêtes";
+      } else btn.style.display = "none";
     } else $("setupBtn").style.display = "none";
     if (phase === "synfo_choice" && isActingPlayer() && prevPhase !== "synfo_choice") showSynfoPanel();
     if (phase === "triggerchoice" && isActingPlayer() && prevPhase !== "triggerchoice") showTrigPanel();
+    // spectateur : FX/sons sur les transitions de phase (pas de logique locale)
+    if (mode === "spectator" && prevPhase !== phase) {
+      if (phase === "goal" || phase === "over") { const gx = goalScorer === 1 ? GOAL_RR.x : GOAL_L.x; burst(gx, GOAL_L.y, ["#ffd166", "#ff6b6b", "#5b9bd4", "#fff"], 50, 5); sndGoal(); }
+      else if (phase === "benshot" || phase === "synfo_choice") { const ball = bodies[8]; burst(ball.x, ball.y, ["#ffd166", "#fff"], 24, 3.5); if (m.turnInfo && m.turnInfo.counter) sndCounter(); else sndTrig(); }
+    }
     if (m.phase === "over" && prevPhase !== "over") endGame(m.goalScorer);
     if ((prevPhase === "synfo_choice" || prevPhase === "synfo_pick") && phase !== "synfo_choice" && phase !== "synfo_pick") hide("synfoPanel");
     if (prevPhase === "triggerchoice" && phase !== "triggerchoice") hide("trigPanel");
@@ -1449,11 +1761,14 @@ const CHAR_INFO = {
   synfo: "Si le ballon la touche, à la fin de la course : laisser le ballon OU passe : choisis l'allié puis oriente librement le ballon autour de lui. Combo : une passe à BenP déclenche son tir gratuit !"
 };
 let charTmr = null;
-function showCharPanel(char) {
+function showCharPanel(char, owner) {
   $("charPanelImg").src = AVATAR_DATA[char];
   $("charPanelName").textContent = CHAR_NAMES[char];
   $("charPanelDesc").textContent = CHAR_INFO[char] || "";
-  $("charPanel").classList.remove("hidden");
+  const panel = $("charPanel");
+  panel.classList.remove("hidden");
+  // v7 : la fiche s'affiche à GAUCHE pour un jeton du camp 1 (gauche), à DROITE pour le camp 2
+  if (owner === 1) { panel.classList.add("left"); } else { panel.classList.remove("left"); }
   clearTimeout(charTmr);
   charTmr = setTimeout(() => $("charPanel").classList.add("hidden"), 9000);
 }
@@ -1464,11 +1779,15 @@ function startGame(m, side) {
   if (mode === "host") setStatus("🏠 Tu es 🔴 Rouge (gauche).");
   if (mode === "guest") setStatus("Tu es 🔵 Bleu (droite).");
   if (mode === "ai") setStatus("🤖 Tu es 🔴 Rouge — l'IA est 🔵 Bleu.");
+  if (mode === "host" || mode === "guest") { $("chatBtn").classList.remove("hidden"); }
+  updateNamesPill();
   startSetup();
   if (mode === "host") broadcastState();
 }
 function startSetup() {
   scores = [0, 0]; turn = 1; actPlayer = 1; phase = "setup"; drag = null;
+  setupDeadline = Date.now() + 60000;
+  armTimer(0);
   benpToken = -1; synfoToken = -1; passTarget = -1;
   freshTurnInfo();
   setupReady = { 1: false, 2: false };
@@ -1481,6 +1800,7 @@ function startSetup() {
 }
 function beginPlay() {
   phase = "aim"; actPlayer = turn;
+  armTimer(30000);
   $("setupBtn").style.display = "none";
   updateBar(); broadcastState();
   scheduleAI();
@@ -1495,7 +1815,7 @@ function saveSideSetup(side) {
 function endGame(winner) {
   phase = "over";
   $("winText").textContent = winner === 1 ? "🏆 Rouge gagne !" : "🏆 Bleu gagne !";
-  show("winOverlay"); updateBar();
+  show("winOverlay"); updateBar(); sndWin();
   if (mode === "host") broadcastState();
   if (ranked && mode === "host" && oppProfile) settleElo(winner === 1);
 }
@@ -1508,6 +1828,9 @@ function backMenu() {
   $("setupBtn").style.display = "none";
   $("reviveBtn").style.display = "none";
   hide("winOverlay"); hide("synfoPanel"); hide("trigPanel"); hide("revivePanel"); show("menu");
+  hide("specLobby"); hide("chatPanel"); hide("specPill"); hide("namesPill"); hide("timerPill"); hide("eloPill");
+  $("chatBtn").classList.add("hidden"); chatOpen = false; chatUnread = 0; $("chatBadge").classList.add("hidden");
+  fx = [];
 }
 
 // ---------- Boutons ----------
@@ -1546,12 +1869,14 @@ function synfoChoose(wantPass) {
     if (!wantPass) sendMsg({ t: "act", kind: "synfo_stay" });
     else {
       phase = "synfo_pick";
+      armTimer(30000);
       setStatus("🎯 Clique sur le jeton qui reçoit la passe.");
     }
     return;
   }
   if (wantPass) {
     phase = "synfo_pick";
+    armTimer(30000);
     setStatus("🎯 Clique sur le jeton qui reçoit la passe.");
     broadcastState();
   } else {
@@ -1586,6 +1911,23 @@ $("btnRanked").onclick = () => { if (!netAvailable()) { alert("La bibliothèque 
 $("btnLadder").onclick = openLadder;
 $("btnCloseLadder").onclick = () => { hide("ladderPanel"); try { if (ladderMq) ladderMq.end(true); } catch (e) {} ladderMq = null; };
 $("btnCancelQueue").onclick = () => { stopQueue(true); ranked = false; oppProfile = null; hide("queuePanel"); show("menu"); };
+// ---------- Boutons v7 : spectateur, chat, mute ----------
+$("btnWatch").onclick = startWatch;
+$("btnDoSpec").onclick = doSpectate;
+$("specCode").addEventListener("keydown", (e) => { if (e.key === "Enter") doSpectate(); });
+$("btnCancelSpec").onclick = () => { cleanupNet(); mode = null; hide("specLobby"); show("menu"); };
+$("muteBtn").onclick = () => {
+  muted = !muted;
+  try { localStorage.setItem("pichn_mute", muted ? "1" : "0"); } catch (e) {}
+  $("muteBtn").textContent = muted ? "🔇" : "🔊";
+  if (!muted) sndUi();
+};
+$("muteBtn").textContent = muted ? "🔇" : "🔊";
+$("chatBtn").onclick = toggleChat;
+$("chatIn").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { const v = $("chatIn").value; $("chatIn").value = ""; sendChat(v); }
+  e.stopPropagation();
+});
 $("btnPseudoOk").onclick = () => {
   const v = $("pseudoInput").value.trim().slice(0, 15);
   if (v.length < 2) { alert("Entre au moins 2 caractères."); return; }
@@ -1608,6 +1950,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="nJHa8zC8q9QkJVr2scBwgw==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="KhX5pXqDihKpcUDx3cc2Ww==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
