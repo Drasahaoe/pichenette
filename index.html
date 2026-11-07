@@ -111,7 +111,7 @@
 <div class="overlay" id="menu">
   <div class="card">
     <h1>🏑 <span class="accent">Pichenette</span></h1>
-    <div class="sub">Duel de pichenettes tour par tour — classé, ami ou contre l'IA. <b>v4</b> <span style="opacity:.65">(si vous ne voyez pas « v4 » ici, faites Ctrl+F5 pour mettre à jour !)</span></div>
+    <div class="sub">Duel de pichenettes tour par tour — classé, ami ou contre l'IA. <b>v6</b> <span style="opacity:.65">(si vous ne voyez pas « v6 » ici, faites Ctrl+F5 pour mettre à jour !)</span></div>
     <button class="btn primary" id="btnLocal">👥 2 joueurs — même écran</button>
     <button class="btn" id="btnAI">🤖 Jouer contre l'IA</button>
     <button class="btn" id="btnRanked">🏆 Partie classée — queue & Elo</button>
@@ -163,6 +163,15 @@
     <h2>🎯 Synfo a touché le ballon</h2>
     <button class="btn primary" id="btnSynfoStay">▶️ Laisser la trajectoire du ballon</button>
     <button class="btn" id="btnSynfoPass">🎯 Faire une passe (choisir un jeton)</button>
+  </div>
+</div>
+
+<!-- CHOIX D'EFFET -->
+<div class="overlay hidden" id="trigPanel">
+  <div class="card">
+    <h2>🎁 Deux effets disponibles !</h2>
+    <div class="sub">Le ballon a touché <b>BenP</b> et <b>Synfo</b> — choisis <b>un</b> effet, l'autre sera perdu.</div>
+    <div id="trigList"></div>
   </div>
 </div>
 
@@ -287,14 +296,19 @@ let bodies = [];           // 0..3 jetons rouges, 4..7 bleus, 8 ballon
 let scores = [0, 0];
 let turn = 1;              // joueur qui a la main (pichenette)
 let actPlayer = 1;         // joueur qui agit maintenant (flick, tir gratuit, choix Synfo)
-let phase = "setup";       // setup | aim | moving | benshot | synfo_choice | synfo_pick | revive_pick | goal | over
+let phase = "setup";       // setup | aim | moving | benshot | synfo_choice | synfo_pick | synfo_orient | triggerchoice | revive_pick | goal | over
 let mode = null;           // local | host | guest | ai
 let mySide = 0;
 let peer = null, conn = null; // obsolètes (ancien PeerJS) — conservés pour compat
 let goalTimer = 0, goalScorer = 0, lastMsg = 0;
 let benpToken = -1, synfoToken = -1, passTarget = -1;
-let pend = { benp: -1, synfo: -1 }; // triggers à la fin de la trajectoire du ballon
-let turnInfo = { flickedChar: null, bonusActive: false, benpUsed: false, synfoUsed: false };
+let pendIdx = -1;         // trigger armé par la course en cours — une seule fente : la DERNIÈRE touche gagne
+let pendArmer = 0;        // camp qui a joué la course ayant armé le trigger
+let deferred = [];        // triggers de son propre camp différés derrière les coups restants (bonus Drasah)
+let trigOpts = [];        // options du panneau de choix d'effet
+let inResolution = false; // pendant une résolution d'effet : tout nouveau trigger se résout immédiatement
+let chainCount = 0;       // sécurité : plafond d'effets enchaînés dans un tour
+let turnInfo = { flickedChar: null, bonusActive: false, counter: false };
 let setupReady = { 1: false, 2: false };
 const savedSetup = { 1: null, 2: null };
 let simActive = false, simGoal = null;
@@ -322,7 +336,7 @@ function resetPositions() {
     }
   }
 }
-function freshTurnInfo() { turnInfo = { flickedChar: null, bonusActive: false, benpUsed: false, synfoUsed: false }; }
+function freshTurnInfo() { turnInfo = { flickedChar: null, bonusActive: false, counter: false }; pendIdx = -1; pendArmer = 0; deferred = []; trigOpts = []; inResolution = false; chainCount = 0; }
 
 // ---------- UI ----------
 const $ = (id) => document.getElementById(id);
@@ -336,6 +350,8 @@ function updateBar(bonus) {
   const name = turn === 1 ? "Rouge" : "Bleu";
   if (phase === "setup") pill.textContent = "Placement des jetons…";
   else if (phase === "moving") pill.textContent = "Pièces en mouvement…";
+  else if (phase === "triggerchoice") pill.textContent = "Choix de l'effet : " + name;
+  else if (turnInfo.counter && (phase === "benshot" || phase === "synfo_choice" || phase === "synfo_pick" || phase === "synfo_orient")) pill.textContent = "⚡ Contre-jeu : " + (actPlayer === 1 ? "Rouge" : "Bleu");
   else pill.textContent = "Tour : " + name + (bonus ? " (rejoue !)" : "");
   pill.className = "pill " + (phase === "setup" ? "" : (turn === 1 ? "red" : "blue")) + (bonus ? " bonus" : "");
   const tp = $("terrainPill");
@@ -449,8 +465,7 @@ function handleContact(a, b) {
     const tok = a.type === "ball" ? b : a;
     if (tok.type !== "token" || tok.out || !tok.alive) return;
     if (simActive) return; // l'IA évalue sans déclencher les triggers
-    if (tok.char === "benp" && !turnInfo.benpUsed && pend.benp < 0) pend.benp = bodies.indexOf(tok);
-    else if (tok.char === "synfo" && !turnInfo.synfoUsed && pend.synfo < 0) pend.synfo = bodies.indexOf(tok);
+    if ((tok.char === "benp" || tok.char === "synfo") && chainCount < 12) pendIdx = bodies.indexOf(tok); // une seule fente par course : la DERNIÈRE touche gagne
   }
 }
 function killToken(b) {
@@ -463,7 +478,7 @@ function checkExits() {
   const ball = bodies[8];
   if (ball.x < 0 || ball.x > W || ball.y < 0 || ball.y > H) {
     ball.x = W / 2; ball.y = H / 2; ball.vx = 0; ball.vy = 0;
-    if (!simActive) { pend.benp = -1; pend.synfo = -1; flash("⚽ Ballon sorti — remis au centre."); }
+    if (!simActive) { pendIdx = -1; flash("⚽ Ballon sorti — remis au centre."); }
   }
   for (let i = 0; i < 8; i++) {
     const b = bodies[i];
@@ -489,43 +504,106 @@ function onGoal(scorer) {
   if (scores[scorer - 1] >= WIN_SCORE) { phase = "over"; endGame(scorer); }
   updateBar(); broadcastState();
 }
-// Fin de trajectoire : on résout les triggers en attente (BenP puis Synfo), sinon fin de tour.
+// ---------- Résolution des triggers ----------
+// Un trigger n'est valable que si son jeton est vivant et sur le terrain au moment de la résolution.
+function trigValid(i) { const t = bodies[i]; return i >= 0 && t && t.type === "token" && t.alive && !t.out && (t.char === "benp" || t.char === "synfo"); }
+function hasPlayable(side) { for (let i = 0; i < 8; i++) { const b = bodies[i]; if (b.owner === side && b.alive && !b.out) return true; } return false; }
+// Fin de trajectoire : contre-jeu prioritaire, sinon triggers du camp après ses coups, sinon fin de tour.
 function processPend() {
-  hide("synfoPanel");
-  if (pend.benp >= 0) {
-    const i = pend.benp; pend.benp = -1;
-    turnInfo.benpUsed = true;
-    actPlayer = bodies[i].owner;
-    phase = "benshot";
-    flash("🔵 BenP : tir gratuit au ballon, depuis sa position !");
-    updateBar(); broadcastState();
-    if (mode === "ai" && actPlayer === 2) setTimeout(aiFreeShot, 600);
-    return;
-  }
-  if (pend.synfo >= 0) {
-    const i = pend.synfo; pend.synfo = -1;
-    turnInfo.synfoUsed = true;
-    actPlayer = bodies[i].owner;
-    phase = "synfo_choice";
-    flash("🟣 Synfo a touché le ballon — choix à la fin de sa course.");
-    if (isActingPlayer()) showSynfoPanel();
-    updateBar(); broadcastState();
-    if (mode === "ai" && actPlayer === 2) setTimeout(aiSynfo, 700);
-    return;
+  hide("synfoPanel"); hide("trigPanel");
+  const cur = pendIdx; pendIdx = -1;
+  if (cur >= 0 && trigValid(cur)) {
+    const tok = bodies[cur];
+    if (tok.owner !== pendArmer) { startTrigger(cur, true); return; } // CONTRE JEU : résolution immédiate, prioritaire
+    if (!inResolution && turnInfo.flickedChar === "drasah" && !turnInfo.bonusActive) { deferred.push(cur); endTurn(); return; } // différé derrière la 2e pichenette
+    deferred.push(cur); // plus de coups à jouer : résolution après le tour (via endTurn)
   }
   endTurn();
 }
+// Démarre un effet (BenP : tir gratuit / Synfo : choix passe). isCounter → bannière CONTRE JEU.
+function startTrigger(i, isCounter) {
+  if (!trigValid(i)) { endTurn(); return; }
+  chainCount++;
+  const tok = bodies[i];
+  actPlayer = tok.owner;
+  turnInfo.counter = !!isCounter;
+  inResolution = true;
+  const team = tok.owner === 1 ? "Rouge" : "Bleu";
+  if (tok.char === "benp") {
+    phase = "benshot";
+    flash(isCounter ? "⚡ CONTRE JEU — BenP " + team + " : tir gratuit !" : "🔵 BenP " + team + " : tir gratuit au ballon, depuis sa position !");
+    updateBar(); broadcastState();
+    if (mode === "ai" && actPlayer === 2) setTimeout(aiFreeShot, 600);
+  } else {
+    phase = "synfo_choice";
+    flash(isCounter ? "⚡ CONTRE JEU — Synfo " + team + " : à elle de choisir !" : "🟣 Synfo " + team + " a touché le ballon — choix à la fin de sa course.");
+    if (isActingPlayer()) showSynfoPanel();
+    updateBar(); broadcastState();
+    if (mode === "ai" && actPlayer === 2) setTimeout(aiSynfo, 700);
+  }
+}
+// Deux effets du même camp en attente : le joueur en choisit UN, l'autre est perdu.
+function startTrigChoice(cands) {
+  chainCount++;
+  trigOpts = cands;
+  actPlayer = turn;
+  turnInfo.counter = false;
+  inResolution = true;
+  phase = "triggerchoice";
+  flash("🎁 Deux effets touchés — choisis-en un !");
+  if (isActingPlayer()) showTrigPanel();
+  updateBar(); broadcastState();
+  if (mode === "ai" && actPlayer === 2) setTimeout(aiTrigChoice, 800);
+}
+function showTrigPanel() {
+  const list = $("trigList");
+  list.innerHTML = "";
+  for (const i of trigOpts) {
+    const b = bodies[i];
+    if (!b) continue;
+    const btn = document.createElement("button");
+    btn.className = "btn primary";
+    btn.innerHTML = b.char === "benp" ? "🔵 <b>BenP</b> — tir gratuit au ballon" : "🟣 <b>Synfo</b> — passe (choisir l'allié)";
+    btn.onclick = () => trigChoose(i);
+    list.appendChild(btn);
+  }
+  show("trigPanel");
+}
+function trigChoose(i) {
+  hide("trigPanel");
+  if (mode === "guest") { sendMsg({ t: "act", kind: "trig_choice", idx: i }); return; }
+  applyAct("trig_choice", { idx: i });
+}
+function aiTrigChoice() {
+  if (mode !== "ai" || phase !== "triggerchoice" || actPlayer !== 2) return;
+  let pick = trigOpts.find((i) => bodies[i] && bodies[i].char === "benp");
+  if (pick === undefined) pick = trigOpts[0];
+  applyAct("trig_choice", { idx: pick });
+}
 function endTurn() {
-  hide("synfoPanel");
+  hide("synfoPanel"); hide("trigPanel");
   if (turnInfo.flickedChar === "drasah" && !turnInfo.bonusActive) {
     turnInfo.bonusActive = true;
     phase = "aim"; actPlayer = turn;
     flash("🎁 Drasah : rejoue une 2e pichenette !");
+  } else if (deferred.length) {
+    const cands = deferred.filter(trigValid);
+    deferred = [];
+    if (cands.length >= 2) { startTrigChoice(cands); return; }
+    if (cands.length === 1) { startTrigger(cands[0], false); return; }
+    endTurn(); return;
   } else {
     turn = turn === 1 ? 2 : 1;
     actPlayer = turn;
     phase = "aim";
     freshTurnInfo();
+    // extermination : aucun jeton jouable ET aucune ressuscitation possible → défaite immédiate
+    if (!hasPlayable(turn) && ownDeadIdx(turn).length === 0) {
+      goalScorer = turn === 1 ? 2 : 1;
+      endGame(goalScorer);
+      updateBar(); broadcastState();
+      return;
+    }
   }
   updateBar(turnInfo.bonusActive); broadcastState();
   scheduleAI();
@@ -535,8 +613,7 @@ function applyFlick(idx, vx, vy) {
   if (!b || b.type !== "token" || !b.alive || b.out) return;
   b.vx = vx; b.vy = vy;
   turnInfo.flickedChar = b.char;
-  turnInfo.benpUsed = false; turnInfo.synfoUsed = false;
-  pend = { benp: -1, synfo: -1 };
+  pendIdx = -1; pendArmer = turn; inResolution = false;
   actPlayer = turn;
   phase = "moving";
   setStatus("💨 Pichenette de " + CHAR_NAMES[b.char] + " !");
@@ -547,6 +624,7 @@ function applyAct(kind, d) {
   const ball = bodies[8];
   if (kind === "benp_shot" && phase === "benshot") {
     ball.vx = d.vx; ball.vy = d.vy;
+    pendIdx = -1; pendArmer = actPlayer;
     phase = "moving";
     setStatus("🔵 BenP tire au ballon !");
   } else if (kind === "synfo_stay" && phase === "synfo_choice") {
@@ -564,16 +642,21 @@ function applyAct(kind, d) {
     ball.x = Math.max(ball.r, Math.min(W - ball.r, ball.x));
     ball.y = Math.max(ball.r, Math.min(H - ball.r, ball.y));
     setStatus("🎯 Passe de Synfo à " + CHAR_NAMES[tgt.char] + " !");
-    // COMBO : ballon collé à BenP → tir gratuit immédiat
-    if (tgt.char === "benp" && !turnInfo.benpUsed) {
-      pend.benp = passTarget;
+    // COMBO : ballon collé à BenP → tir gratuit immédiat (chaîne autorisée)
+    if (tgt.char === "benp" && chainCount < 12) {
+      pendIdx = passTarget; pendArmer = actPlayer;
       passTarget = -1;
       processPend();
       return;
     }
     passTarget = -1;
+    pendIdx = -1;
     phase = "aim";
     endTurn();
+  } else if (kind === "trig_choice" && phase === "triggerchoice") {
+    if (!Array.isArray(trigOpts) || trigOpts.indexOf(d.idx) < 0) return;
+    trigOpts = [];
+    startTrigger(d.idx, false);
   }
   updateBar(turnInfo.bonusActive); broadcastState();
 }
@@ -729,10 +812,10 @@ function pointerUp(e) {
   if (kind === "token") {
     if (mode === "guest") {
       sendMsg({ t: "flick", idx, vx, vy });
-      b.vx = vx; b.vy = vy; phase = "moving"; updateBar();
+      b.vx = vx; b.vy = vy; phase = "moving"; pendIdx = -1; pendArmer = turn; updateBar();
     } else applyFlick(idx, vx, vy);
   } else if (kind === "ballaim") {
-    if (mode === "guest") { sendMsg({ t: "act", kind: "benp_shot", vx, vy }); b.vx = vx; b.vy = vy; phase = "moving"; }
+    if (mode === "guest") { sendMsg({ t: "act", kind: "benp_shot", vx, vy }); b.vx = vx; b.vy = vy; phase = "moving"; pendIdx = -1; pendArmer = actPlayer; }
     else applyAct("benp_shot", { vx, vy });
   }
 }
@@ -818,7 +901,13 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(ball.x, ball.y - 46); ctx.lineTo(ball.x, ball.y - 30);
     ctx.moveTo(ball.x - 8, ball.y - 38); ctx.lineTo(ball.x, ball.y - 46); ctx.lineTo(ball.x + 8, ball.y - 38);
     ctx.strokeStyle = "#ffd166"; ctx.lineWidth = 3; ctx.stroke();
-    drawBanner(isActingPlayer() || mode === "local" ? "🎁 TIR GRATUIT — TIRE SUR LE BALLON !" : "🎁 Tir gratuit adverse…", true);
+    drawBanner(turnInfo.counter ? ((isActingPlayer() || mode === "local") ? "⚡ CONTRE JEU — TIR GRATUIT : TIRE !" : "⚡ CONTRE JEU — tir gratuit adverse…") : (isActingPlayer() || mode === "local" ? "🎁 TIR GRATUIT — TIRE SUR LE BALLON !" : "🎁 Tir gratuit adverse…"), true);
+  }
+  if (phase === "synfo_choice" || phase === "synfo_pick" || phase === "synfo_orient") {
+    drawBanner(turnInfo.counter ? "⚡ CONTRE JEU — " + (actPlayer === 1 ? "ROUGE" : "BLEU") : "🟣 SYNFO — " + (actPlayer === 1 ? "ROUGE" : "BLEU"), isActingPlayer() || mode === "local");
+  }
+  if (phase === "triggerchoice") {
+    drawBanner((isActingPlayer() || mode === "local") ? "🎁 CHOISIS TON EFFET !" : "⏳ Choix de l'adversaire…", true);
   }
   // bouton de ressuscitation visible si le joueur actif a un jeton éliminé
   const rev = $("reviveBtn");
@@ -835,6 +924,7 @@ function draw() {
     else setStatus("⏳ Tour de l'adversaire…");
   } else if (phase === "benshot" && (mode !== "guest" || isActingPlayer())) setStatus(isActingPlayer() ? "🎁 BENP : TIR GRATUIT — À TOI DE JOUER : tire en arrière sur le ballon (cercle jaune) !" : "🎁 BenP offre un tir gratuit à l'adversaire…");
   else if (phase === "synfo_pick" && (mode !== "guest" || isActingPlayer())) setStatus("🎯 Passe : clique sur le jeton allié qui reçoit le ballon.");
+  else if (phase === "triggerchoice" && (mode !== "guest" || isActingPlayer())) setStatus(isActingPlayer() ? "🎁 Deux effets touchés — choisis-en un (l'autre sera perdu) !" : "⏳ L'adversaire choisit son effet…");
 }
 function drawBanner(text, mine) {
   ctx.save();
@@ -1138,7 +1228,7 @@ function mqConnect() {
         if (!netUp) {
           cleanupNet();
           $("btnDoJoin").disabled = false; $("btnDoJoin").textContent = "Rejoindre";
-          alert("Partie introuvable. Vérifie le code ET que vous avez TOUS LES DEUX la dernière version (le menu doit afficher « v4 » — sinon Ctrl+F5). Attends aussi que l'hôte voie bien son code affiché.");
+          alert("Partie introuvable. Vérifie le code ET que vous avez TOUS LES DEUX la dernière version (le menu doit afficher « v6 » — sinon Ctrl+F5). Attends aussi que l'hôte voie bien son code affiché.");
         }
       }, 12000);
     }
@@ -1201,7 +1291,7 @@ function sendMsg(m) {
 }
 function broadcastState() {
   if (mode === "host") {
-    sendMsg({ t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady, terrain });
+    sendMsg({ t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady, terrain, trigOpts });
   }
 }
 function onMsg(m) {
@@ -1214,6 +1304,7 @@ function onMsg(m) {
     else if (m.kind === "synfo_stay" && phase === "synfo_choice") applyAct("synfo_stay", {});
     else if (m.kind === "synfo_pick" && m.idx !== undefined && (phase === "synfo_choice" || phase === "synfo_pick")) startSynfoOrient(m.idx);
     else if (m.kind === "synfo_place" && phase === "synfo_orient") applyAct("synfo_place", { x: m.x, y: m.y });
+    else if (m.kind === "trig_choice" && m.idx !== undefined && phase === "triggerchoice") applyAct("trig_choice", { idx: m.idx });
   } else if (m.t === "setup_done" && mode === "host") {
     if (phase === "setup" && Array.isArray(m.pos) && m.pos.length === 4) {
       for (let i = 0; i < 4; i++) {
@@ -1231,6 +1322,7 @@ function onMsg(m) {
     bodies = m.bodies; scores = m.scores; turn = m.turn; actPlayer = m.actPlayer || m.turn;
     goalScorer = m.goalScorer;
     if (m.turnInfo) turnInfo = m.turnInfo;
+    if (m.trigOpts) trigOpts = m.trigOpts;
     if (m.terrain && TERRAINS[m.terrain]) terrain = m.terrain;
     const prevPhase = phase;
     phase = m.phase;
@@ -1243,8 +1335,10 @@ function onMsg(m) {
       btn.textContent = already ? "✅ Prêt — en attente de l'hôte…" : "✅ Mes positions sont prêtes";
     } else $("setupBtn").style.display = "none";
     if (phase === "synfo_choice" && isActingPlayer() && prevPhase !== "synfo_choice") showSynfoPanel();
+    if (phase === "triggerchoice" && isActingPlayer() && prevPhase !== "triggerchoice") showTrigPanel();
     if (m.phase === "over" && prevPhase !== "over") endGame(m.goalScorer);
     if ((prevPhase === "synfo_choice" || prevPhase === "synfo_pick") && phase !== "synfo_choice" && phase !== "synfo_pick") hide("synfoPanel");
+    if (prevPhase === "triggerchoice" && phase !== "triggerchoice") hide("trigPanel");
     updateBar(m.turnInfo ? m.turnInfo.bonusActive : false);
   } else if (m.t === "elo" && mode === "guest") {
     const p = getProfile();
@@ -1260,7 +1354,7 @@ function onMsg(m) {
 // ---------- Profil, Elo, queue & classement ----------
 const ELO_START = 1000, ELO_K = 32;
 let ranked = false, oppProfile = null;
-let queueMq = null, queueTmr = null, myQid = null, ladderMq = null;
+let queueMq = null, queueTmr = null, myQid = null, ladderMq = null, queueMatched = false;
 function loadProfile() { try { const p = JSON.parse(localStorage.getItem("pichn_profile")); if (p && p.name) return p; } catch (e) {} return null; }
 function getProfile() { return loadProfile() || { name: "", elo: ELO_START, w: 0, l: 0 }; }
 function saveProfile(p) { try { localStorage.setItem("pichn_profile", JSON.stringify(p)); } catch (e) {} }
@@ -1284,6 +1378,7 @@ function startQueue() {
   const prof = getProfile();
   if (!prof.name) { show("pseudoPanel"); $("pseudoInput").focus(); return; }
   ranked = true;
+  queueMatched = false;
   hide("menu"); show("queuePanel");
   $("queueState").textContent = "Recherche d'un adversaire classé…";
   myQid = Math.random().toString(36).slice(2, 10);
@@ -1300,6 +1395,9 @@ function startQueue() {
     if (m.t === "q" && m.id && m.id !== myQid) {
       // règle déterministe : le plus grand id héberge le match
       if (myQid > m.id) {
+        if (queueMatched) return; // anti double-match : les annonces suivantes ne doivent pas re-créer la partie
+        queueMatched = true;
+        clearInterval(queueTmr); queueTmr = null; // cesser immédiatement nos annonces
         // terrain aléatoire en classé
         const terrains = ["pelouse", "glace", "terre"];
         terrain = terrains[Math.floor(Math.random() * terrains.length)];
@@ -1310,6 +1408,9 @@ function startQueue() {
         setTimeout(() => { stopQueue(true); hide("queuePanel"); startHost({ code, ranked: true, opp: { name: m.name, elo: m.elo } }); }, 1600);
       }
     } else if (m.t === "invite" && m.to === myQid) {
+      if (queueMatched) return; // anti double-join : ignorer les invites suivantes (redites ×4 ou codes obsolètes)
+      queueMatched = true;
+      clearInterval(queueTmr); queueTmr = null;
       if (m.terr && TERRAINS[m.terr]) { terrain = m.terr; refreshTerrainBtns(); }
       $("queueState").textContent = "⚔️ Adversaire trouvé : " + (m.name || "?") + " (" + (m.elo || ELO_START) + ") — terrain : " + TERRAINS[terrain].emoji + " " + TERRAINS[terrain].name + " !";
       const invite = m;
@@ -1369,11 +1470,10 @@ function startGame(m, side) {
 function startSetup() {
   scores = [0, 0]; turn = 1; actPlayer = 1; phase = "setup"; drag = null;
   benpToken = -1; synfoToken = -1; passTarget = -1;
-  pend = { benp: -1, synfo: -1 };
   freshTurnInfo();
   setupReady = { 1: false, 2: false };
   resetPositions();
-  hide("synfoPanel"); hide("revivePanel"); hide("winOverlay");
+  hide("synfoPanel"); hide("trigPanel"); hide("revivePanel"); hide("winOverlay");
   const btn = $("setupBtn");
   btn.style.display = "block"; btn.disabled = false;
   btn.textContent = mode === "local" || mode === "ai" ? "✅ Commencer la partie" : "✅ Mes positions sont prêtes";
@@ -1407,7 +1507,7 @@ function backMenu() {
   cleanupNet(); clearTimeout(aiTimer); mode = null; ranked = false; oppProfile = null;
   $("setupBtn").style.display = "none";
   $("reviveBtn").style.display = "none";
-  hide("winOverlay"); hide("synfoPanel"); hide("revivePanel"); show("menu");
+  hide("winOverlay"); hide("synfoPanel"); hide("trigPanel"); hide("revivePanel"); show("menu");
 }
 
 // ---------- Boutons ----------
@@ -1508,6 +1608,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="w4KkVvh9hCgUk24Zby+5eQ==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="nJHa8zC8q9QkJVr2scBwgw==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
