@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="fr">
 <head>
@@ -509,7 +508,7 @@ function canFlick(idx) {
   // candidat et passait son tour au lieu de jouer.)
   const mine = (mode === "local" || mode === "ai") ? b.owner === turn : (b.owner === mySide && b.owner === turn);
   if (!mine) return false;
-  return !turnInfo.baseUsed || turnInfo.drasahExtra || (bonusFlicks[idx] || 0) > 0;
+  return !turnInfo.baseUsed || (turnInfo.drasahExtra && b.char === "drasah") || (bonusFlicks[idx] || 0) > 0;
 }
 function isActingPlayer() {
   if (mode === "local") return true;
@@ -832,7 +831,7 @@ function endTurn() {
     // n'ont plus aucune ressource et le rejoue de Drasah devient impossible)
     phase = "aim"; actPlayer = turn;
     armTimer(30000);
-    flash("🎁 Drasah : rejoue une 2e pichenette !");
+    flash("🎁 Drasah : rejoue une 2e pichenette avec Drasah !");
   } else if (Object.keys(bonusFlicks).some((k) => bonusFlicks[k] > 0)) {
     phase = "aim"; actPlayer = turn;
     armTimer(30000);
@@ -868,7 +867,7 @@ function applyFlick(idx, vx, vy) {
   if (!b || b.type !== "token" || !b.alive || b.out) return;
   // quelle ressource ce coup consomme-t-il ?
   if (!turnInfo.baseUsed) turnInfo.baseUsed = true;
-  else if (turnInfo.drasahExtra) turnInfo.drasahExtra = false;
+  else if (turnInfo.drasahExtra && b.char === "drasah") turnInfo.drasahExtra = false; // la 2e pichenette Drasah se joue uniquement avec Drasah lui-même
   else if ((bonusFlicks[idx] || 0) > 0) bonusFlicks[idx]--;
   else return; // aucune pichenette disponible (sécurité)
   turnFlicks++;
@@ -1949,10 +1948,15 @@ function simulateFlick(idx, vx, vy) {
 }
 // IA : simulation de coups DÉCOUPÉE en petits lots asynchrones — l'interface ne gèle jamais,
 // même sur la glace (friction faible = simulations longues). Les meilleurs coups sont notés au fil de l'eau.
-let aiThinking = false;
+let aiThinking = false, aiThinkSince = 0, aiRetries = 0;
 function aiPlay() {
   if (mode !== "ai" || turn !== 2 || phase !== "aim") return;
-  if (aiThinking) return;
+  if (aiThinking) {
+    // garde-fou : un crash dans une simulation aurait pu laisser aiThinking bloqué à true
+    // (l'IA gelait alors TOUS ses tours jusqu'au délai de 30 s). Au-delà de 4 s, on reprend la main.
+    if (Date.now() - aiThinkSince > 4000) aiThinking = false;
+    else return;
+  }
   const deads = ownDeadIdx(2);
   const ball = bodies[8];
   const targets = [ball, GOAL_L];
@@ -1973,6 +1977,7 @@ function aiPlay() {
   const step = () => {
     if (mode !== "ai" || turn !== 2 || phase !== "aim") { aiThinking = false; return; } // la situation a changé : abandon
     const end = Math.min(cands.length, (step.pos || 0) + CH);
+    try {
     for (; step.pos < end; step.pos++) {
       const c = cands[step.pos];
       const v = MAX_DRAG * POWER * c.pw;
@@ -1992,15 +1997,22 @@ function aiPlay() {
       score += Math.random() * 8;
       if (!best || score > best.score) best = { idx: c.i, vx: Math.cos(c.ang) * v, vy: Math.sin(c.ang) * v, score };
     }
+    } catch (e) {
+      // une simulation a planté : on ne gèle JAMAIS le jeu — 2 essais, puis l'IA passe proprement son tour
+      aiThinking = false;
+      if (aiRetries < 2) { aiRetries++; scheduleAI(); }
+      else { aiRetries = 0; endTurn(); }
+      return;
+    }
     if (step.pos < cands.length) { setTimeout(step, 0); return; } // lot suivant : l'UI respire
-    aiThinking = false;
-    if (deads.length && (!best || best.score < 20 || deads.length >= 2)) { applyRevive(deads[0]); return; }
+    aiThinking = false; aiRetries = 0;
+    if (deads.length && (!best || best.score < 20)) { applyRevive(deads[0]); return; } // ressuscite seulement si aucun bon coup (avant : deads>=2 forçait la réanimation à chaque tour → l'IA ne pichenettait plus)
     if (best) applyFlick(best.idx, best.vx, best.vy);
     else if (deads.length) applyRevive(deads[0]);
     else endTurn(); // sécurité : aucun coup possible (bonus épuisés, jetons morts) → passer
   };
   step.pos = 0;
-  aiThinking = true;
+  aiThinking = true; aiThinkSince = Date.now();
   setTimeout(step, 0);
 }
 function aiFreeShot() {
@@ -2515,7 +2527,7 @@ function renderLadder(seen) {
 }
 // ---------- Fiche personnage ----------
 const CHAR_INFO = {
-  drasah: "Jouable deux fois de suite : le jouer offre une 2e pichenette immédiate (une fois, pas de chaîne).",
+  drasah: "Jouable deux fois de suite : le jouer offre une 2e pichenette immédiate, jouable uniquement avec Drasah lui-même (une fois, pas de chaîne).",
   wun: "Retourne tout jeton adverse qu'il touche, à tout moment (jeton mort : ne se joue plus mais bloque). Ranimable uniquement par le contact d'un jeton allié.",
   benp: "Si le ballon le touche (même pendant le tour adverse), à la fin de la course du ballon son camp obtient un tir gratuit depuis la position du ballon.",
   synfo: "Si le ballon la touche, à la fin de la course : laisser le ballon OU passe : choisis l'allié puis oriente librement le ballon autour de lui. Combo : une passe à BenP déclenche son tir gratuit !",
@@ -2738,6 +2750,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="iffW1hSi+PR/RERWWkNFkA==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="4Ocz9Pz/93l7UBlD3vMqMw==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
