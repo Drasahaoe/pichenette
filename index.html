@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="fr">
 <head>
@@ -87,6 +88,23 @@
   .pill.terrain { background: #22384f; border-color: #3f6b5a; }
   .pill.elo { background: #3d3350; border-color: #7d64b0; }
   .terrains { display: flex; gap: 8px; margin: 8px 0 16px; }
+  .menu-card { max-width: 620px; text-align: center; }
+  .menu-hero { font-size: 38px; font-weight: 800; letter-spacing: 1px; margin-bottom: 4px; }
+  .action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0; }
+  .action-card { background: #263a55; border: 1px solid #3b5170; border-radius: 14px; padding: 18px 8px; cursor: pointer; color: #e8edf5; transition: transform .15s, box-shadow .15s, border-color .15s; display: flex; flex-direction: column; align-items: center; gap: 6px; font-family: inherit; }
+  .action-card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,.45); border-color: #ffd166; }
+  .action-card .ic { font-size: 30px; }
+  .action-card .t1 { font-weight: 800; font-size: 15px; }
+  .action-card .t2 { font-size: 11px; opacity: .72; }
+  .menu-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .menu-row .btn { width: auto; margin: 0; padding: 9px 14px; font-size: 14px; }
+  .rules-card { max-width: 640px; max-height: 85vh; overflow-y: auto; }
+  #btnRulesGame { position: fixed; bottom: 16px; right: 16px; width: auto; padding: 10px 16px; margin: 0; z-index: 5; }
+  #goalOverlay { background: transparent; pointer-events: none; z-index: 8; }
+  #goalText { font-size: 74px; font-weight: 900; letter-spacing: 4px; text-shadow: 0 6px 30px rgba(0,0,0,.75); text-align: center; animation: goalPop .5s cubic-bezier(.2,1.6,.4,1) both; }
+  #goalSub { font-size: 22px; font-weight: 700; text-align: center; margin-top: 6px; text-shadow: 0 3px 12px rgba(0,0,0,.8); animation: goalPop .6s .15s both; }
+  @keyframes goalPop { 0% { transform: scale(.2); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  #winStats { text-align: left; line-height: 1.75; background: rgba(255,255,255,.05); border-radius: 10px; padding: 10px 14px; margin: 12px 0; font-size: 14px; }
   .tbtn { flex: 1; padding: 10px 6px; border-radius: 10px; background: #26354a; border: 2px solid #3b5170; color: #e8edf5; cursor: pointer; font-size: 14px; font-weight: 600; text-align: center; }
   .tbtn span { display: block; font-size: 11px; font-weight: 400; opacity: .7; margin-top: 3px; }
   .tbtn.sel { border-color: #ffd166; background: #2e445e; box-shadow: 0 0 12px rgba(255,209,102,.25); }
@@ -136,36 +154,53 @@
 
 <!-- MENU -->
 <div class="overlay" id="menu">
-  <div class="card">
-    <h1>🏑 <span class="accent">Pichenette</span></h1>
-    <div class="sub">Duel de pichenettes tour par tour — classé, ami ou contre l'IA. <b>v8</b> <span style="opacity:.65">(si vous ne voyez pas « v8 » ici, faites Ctrl+F5 pour mettre à jour !)</span></div>
-    <button class="btn primary" id="btnLocal">👥 2 joueurs — même écran</button>
-    <button class="btn" id="btnAI">🤖 Jouer contre l'IA</button>
-    <button class="btn" id="btnRanked">🏆 Queue classée</button>
-    <button class="btn" id="btnLadder">📊 Classement mondial</button>
-    <button class="btn" id="btnHost">🌐 Partie amicale — créer (code)</button>
-    <button class="btn" id="btnJoin">🔑 Partie amicale — rejoindre (code)</button>
-    <button class="btn" id="btnWatch">👀 Regarder une partie (code) — spectateur</button>
+  <div class="card menu-card">
+    <div class="menu-hero">🏑 <span class="accent">Pichenette</span></div>
+    <div class="sub">Duel de pichenettes tour par tour — classé, ami ou contre l'IA. <b>v8</b> <span style="opacity:.65">(si vous ne voyez pas « v8 » ici, faites Ctrl+F5 !)</span></div>
+    <div class="action-grid">
+      <button class="action-card" id="btnRanked"><span class="ic">🏆</span><span class="t1">Queue classée</span><span class="t2">Trouve un adversaire en ligne</span></button>
+      <button class="action-card" id="btnAI"><span class="ic">🤖</span><span class="t1">Contre l'IA</span><span class="t2">Partie rapide, entraînement</span></button>
+      <button class="action-card" id="btnLocal"><span class="ic">👥</span><span class="t1">2 joueurs</span><span class="t2">Même écran</span></button>
+    </div>
+    <div class="menu-row">
+      <button class="btn" id="btnHost">🌐 Créer (code)</button>
+      <button class="btn" id="btnJoin">🔑 Rejoindre (code)</button>
+      <button class="btn" id="btnWatch">👀 Spectateur</button>
+    </div>
+    <div class="menu-row">
+      <button class="btn" id="btnLadder">📊 Classement</button>
+      <button class="btn" id="btnRules">📜 Règles & personnages</button>
+    </div>
     <div class="sub" style="margin-bottom:4px">🏟️ Terrain de jeu</div>
     <div class="terrains">
       <button class="tbtn" data-terrain="pelouse">🌿 Pelouse<span>glisse normale</span></button>
       <button class="tbtn" data-terrain="glace">🧊 Glace<span>très glissant, bordures</span></button>
       <button class="tbtn" data-terrain="terre">🟤 Terre battue<span>ça accroche</span></button>
     </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="rulesPanel">
+  <div class="card rules-card">
+    <h2>📜 Règles & personnages</h2>
     <div class="rules">
-      <b>But du jeu :</b> propulse le ballon dans le but adverse. Tu ne touches <b>jamais</b> le ballon directement — uniquement tes jetons (fronde : maintiens, tire en arrière, relâche). Premier à <b>5 points</b>. Le but est <b>plus petit que le ballon</b> : vise juste !<br/><b>Pas de bords :</b> ce qui sort du terrain est sorti — le ballon est remis au centre, un jeton éliminé se ressuscite à ton tour (collé à ton but, au prix de ton coup). <b>Exception : sur 🧊 Glace, des bordures renvoient tout dans le terrain — rien ne sort, tout rebondit.</b><br/>
+      <b>But du jeu :</b> propulse le ballon dans le but adverse. Tu ne touches <b>jamais</b> le ballon directement — uniquement tes jetons (fronde : maintiens, tire en arrière, relâche). La partie s'arrête dès <b>2 buts d'écart</b> — le meneur gagne. Le but est <b>plus petit que le ballon</b> : vise juste !<br/><b>Pas de bords :</b> ce qui sort du terrain est sorti — le ballon est remis au centre, un jeton éliminé se ressuscite à ton tour (collé à ton but, au prix de ton coup). <b>Exception : sur 🧊 Glace, des bordures renvoient tout dans le terrain — rien ne sort, tout rebondit.</b><br/>
+      <b>Engagement :</b> à la première rencontre, le camp qui commence est <b>aléatoire</b> ; après un but, <b>le perdant engage</b> ; en revanche, <b>l'autre camp commence</b>.<br/>
       <b>Personnages</b> — <b>draft</b> : chaque joueur choisit <b>4 personnages parmi 8</b>. En <b>ami / local / IA</b> : les deux camps peuvent choisir les mêmes. En <b>classé</b> : draft <b>alterné</b> (premier choix, puis chacun son tour), <b>10 s par choix</b> sinon aléatoire, un perso pris n'est plus disponible pour l'adversaire :
-      <div class="ch"><img id="miniDrasah" alt="Drasah"/><span><b>Drasah</b> — peut être joué deux fois de suite : le jouer offre une 2e pichenette immédiate (une fois, pas de chaîne).</span></div>
+      <div class="ch"><img id="miniDrasah" alt="Drasah"/><span><b>Drasah</b> — peut être joué deux fois de suite : le jouer offre une 2e pichenette immédiate, <b>uniquement avec Drasah</b> (une fois, pas de chaîne).</span></div>
       <div class="ch"><img id="miniWun" alt="Wun"/><span><b>Wun</b> — retourne tout jeton adverse qu'il touche, <b>à tout moment</b> (jeton mort : ne se joue plus mais bloque). Ranimable uniquement par le contact d'un jeton allié. Deux Wun qui se touchent : celui du joueur qui attaque gagne.</span></div>
       <div class="ch"><img id="miniBenp" alt="BenP"/><span><b>BenP</b> — si le <b>ballon le touche</b> (même pendant le tour adverse), à la fin de la course du ballon son camp obtient un <b>tir gratuit</b> depuis la position du ballon.</span></div>
       <div class="ch"><img id="miniSynfo" alt="Synfo"/><span><b>Synfo</b> — si le <b>ballon la touche</b>, à la fin de la course : laisser le ballon OU <b>passe</b> : choisis l'allié puis <b>oriente librement le ballon autour de lui</b>. Combo : une passe à BenP déclenche son tir gratuit !</span></div>
       <div class="ch"><img id="miniLeure" alt="Leureduthé"/><span><b>Leureduthé</b> — pendant sa course, chaque <b>allié touché</b> gagne une <b>pichenette bonus</b> immédiate (utilisable dans le même tour).</span></div>
-      <div class="ch"><img id="miniMerlin" alt="Merlinpinpin"/><span><b>Merlinpinpin</b> — inamovible : ni jeton adverse ni ballon ne peuvent le déplacer (ses alliés, si). <b>Barre ESPACE</b> : place son <b>mur</b> (tout rebondit, l'ancien disparaît). <b>Un seul mur par tour</b>, uniquement s'il a bougé pendant CE tour (pichenetté ou poussé par un allié) — armement non utilisé = perdu en fin de tour. Le mur reste en place jusqu'à son remplacement.</span></div>
+      <div class="ch"><img id="miniMerlin" alt="Merlinpinpin"/><span><b>Merlinpinpin</b> — inamovible : ni jeton adverse ni ballon ne peuvent le déplacer (ses alliés, si). <b>Barre ESPACE</b> : place son <b>mur</b> (tout rebondit, l'ancien disparaît) — le meilleur moment : <b>ESPACE pendant sa course</b> après l'avoir pichenetté ! <b>Un seul mur par tour</b>, uniquement s'il a bougé pendant CE tour (pichenetté ou poussé par un allié) — armement non utilisé = perdu en fin de tour. Le mur reste en place jusqu'à son remplacement.</span></div>
       <div class="ch"><img id="miniCyrilou" alt="Cyriloulefilou"/><span><b>Cyriloulefilou</b> — comme BenP si le ballon le touche, mais au choix : <b>laisser</b> la balle suivre son chemin OU <b>shooter</b> : le ballon se colle à lui, tu l'orientes librement puis tires (puissance <b>×2</b>) — ce tir <b>ne peut pas marquer</b> et ne déclenche aucun effet.</span></div>
       <div class="ch"><img id="miniMizterio" alt="Mizterio"/><span><b>Mizterio</b> — à la fin de sa course, il peut <b>échanger la place</b> de n'importe quel ennemi qu'il a touché avec n'importe quel autre jeton du plateau.</span></div>
     </div>
+    <button class="btn danger" id="btnCloseRules" style="margin-top:14px">Fermer</button>
   </div>
 </div>
+
+<button class="btn hidden" id="btnRulesGame">❓ Règles</button>
 
 <!-- HOST LOBBY -->
 <div class="overlay hidden" id="hostLobby">
@@ -262,8 +297,16 @@
 <div class="overlay hidden" id="winOverlay">
   <div class="card">
     <div id="winText">🏆</div>
+    <div id="winStats" class="small"></div>
     <button class="btn primary" id="btnRematch">🔁 Revanche</button>
     <button class="btn" id="btnBackMenu">🏠 Menu</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="goalOverlay">
+  <div>
+    <div id="goalText">⚽ BUUUT !</div>
+    <div id="goalSub"></div>
   </div>
 </div>
 
@@ -295,8 +338,8 @@
     <div class="small" style="margin-bottom:6px">Elo mis à jour après chaque partie classée. Ta ligne est surlignée.</div>
     <div class="small" style="margin-bottom:8px;font-weight:700" id="myEloLine">Ton Elo : 1000 (0V - 0D)</div>
     <table class="ladder">
-      <thead><tr><th>#</th><th>Joueur</th><th>Elo</th><th>Bilan</th></tr></thead>
-      <tbody id="ladderBody"><tr><td colspan="4">Chargement…</td></tr></tbody>
+      <thead><tr><th>#</th><th>Joueur</th><th>Elo</th><th>Bilan</th><th>Perso fétiche</th><th>Buts</th></tr></thead>
+      <tbody id="ladderBody"><tr><td colspan="6">Chargement…</td></tr></tbody>
     </table>
     <button class="btn danger" id="btnCloseLadder" style="margin-top:14px">Fermer</button>
   </div>
@@ -384,6 +427,8 @@ let scores = [0, 0];
 let turn = 1;              // joueur qui a la main (pichenette)
 let firstTurn = 1;         // camp qui commence la manche en cours (1re rencontre : aléatoire)
 let lastStarter = 0;       // camp qui a commencé la manche précédente (revanche : l'autre commence)
+let stats = { flicks: [0, 0], walls: [0, 0], outs: [0, 0] }; // stats de fin de partie
+let ballTrail = [];        // traînée du ballon (juice)
 let actPlayer = 1;         // joueur qui agit maintenant (flick, tir gratuit, choix Synfo)
 let phase = "setup";       // setup | aim | moving | benshot | synfo_choice | synfo_pick | synfo_orient | triggerchoice | revive_pick | goal | over
 let mode = null;           // local | host | guest | ai
@@ -442,10 +487,11 @@ function makeBodies(d1, d2) {
   return arr;
 }
 function body(x, y, r, m, type, owner, char) {
-  return { x, y, vx: 0, vy: 0, r, m, type, owner, char, alive: true, out: false };
+  return { x, y, vx: 0, vy: 0, r, m, type, owner, char, alive: true, out: false, wob: 0 };
 }
 function resetPositions() {
   bodies = makeBodies(drafts[1], drafts[2]);
+  ballTrail = [];
   for (const side of [1, 2]) {
     const pos = savedSetup[side];
     if (!pos) continue;
@@ -539,6 +585,7 @@ function stepPhysics() {
       b.vy *= Math.pow(friction(), 1 / SUB);
       const v = Math.hypot(b.vx, b.vy);
       if (v < STOP_V) { b.vx = 0; b.vy = 0; } else anyMove = true;
+      if (b.wob > 0.01) b.wob *= Math.pow(0.80, 1 / SUB); // squash d'impact : décroissance
     }
     collideGoals();
     collideBodies();
@@ -547,6 +594,8 @@ function stepPhysics() {
     checkExits();
     if (checkGoal()) return;
   }
+  const _ball = bodies[8];
+  if (_ball && !_ball.out && (_ball.vx || _ball.vy)) { ballTrail.push({ x: _ball.x, y: _ball.y }); if (ballTrail.length > 22) ballTrail.shift(); } // traînée du ballon
   if (!anyMove) {
     if (simActive) return;
     if (phase === "moving" && mode !== "spectator") processPend();
@@ -613,6 +662,11 @@ function collideBodies() {
           const imp = -(1 + BODY_REST) * dvn / (1 / a.m + 1 / b.m);
           a.vx -= imp / a.m * nx; a.vy -= imp / a.m * ny;
           b.vx += imp / b.m * nx; b.vy += imp / b.m * ny;
+          const impact = -dvn;
+          if (impact > 2.5) {
+            a.wob = Math.min(1, impact / 14); b.wob = Math.min(1, impact / 14); // squash
+            if (!simActive) burst((a.x + b.x) / 2, (a.y + b.y) / 2, ["#ffffff", "#ffd166"], Math.min(14, (3 + impact) | 0), 2); // étincelles d'impact
+          }
         }
       }
       handleContact(a, b);
@@ -706,6 +760,7 @@ function checkExits() {
     if (b.out) continue;
     if (b.x < -10 || b.x > W + 10 || b.y < -10 || b.y > H + 10) {
       b.out = true; b.alive = false; b.vx = 0; b.vy = 0;
+      if (!simActive) stats.outs[turn - 1]++;
       flash("💨 " + CHAR_NAMES[b.char] + " sort du terrain — éliminé !");
     }
   }
@@ -725,6 +780,12 @@ function onGoal(scorer) {
   const gx = scorer === 1 ? GOAL_RR.x : GOAL_L.x;
   burst(gx, GOAL_L.y, ["#ffd166", "#ff6b6b", "#5b9bd4", "#fff", "#7ee89a"], 60, 5);
   sndGoal();
+  // célébration plein écran
+  $("goalText").textContent = "⚽ BUUUT !";
+  $("goalText").style.color = scorer === 1 ? "#ff8a8a" : "#8ac2f5";
+  $("goalSub").textContent = (scorer === 1 ? "🔴 Rouge" : "🔵 Bleu") + " marque — " + scores[0] + " — " + scores[1];
+  show("goalOverlay");
+  for (let k = 1; k <= 4; k++) setTimeout(() => burst(gx - 60 + k * 30, GOAL_L.y + (k % 2 ? -70 : 70), ["#ffd166", "#fff", scorer === 1 ? "#ff6b6b" : "#5b9bd4"], 16, 4), k * 130);
   hide("synfoPanel");
   if (Math.abs(scores[0] - scores[1]) >= WIN_DIFF) { phase = "over"; endGame(scorer); }
   updateBar(); broadcastState();
@@ -874,6 +935,7 @@ function applyFlick(idx, vx, vy) {
   else if ((bonusFlicks[idx] || 0) > 0) bonusFlicks[idx]--;
   else return; // aucune pichenette disponible (sécurité)
   turnFlicks++;
+  stats.flicks[b.owner - 1]++;
   if (turnFlicks > 12) { endTurn(); return; } // garde-fou anti-boucle (Leureduthé miroir)
   if (b.char === "drasah" && !turnInfo.drasahGiven) { turnInfo.drasahExtra = true; turnInfo.drasahGiven = true; } // une fois par tour, pas de chaîne
   b.vx = vx; b.vy = vy;
@@ -886,6 +948,7 @@ function applyFlick(idx, vx, vy) {
   burst(b.x, b.y, ["#ffffff", "#ffd166"], 7, 2.5);
   sndFlick();
   setStatus("💨 Pichenette de " + CHAR_NAMES[b.char] + " !");
+  if (b.char === "merlin") setStatus("🧱 Merlinpinpin bouge — ESPACE pendant la course pour tracer son mur !");
   updateBar(bonusPending()); broadcastState();
 }
 // Action d'un choix — exécutée par l'autorité.
@@ -1101,6 +1164,7 @@ function wallArmed(side) {
   return !!p && (Math.hypot(b.x - p.x, b.y - p.y) > 2);
 }
 function placeWall(side, x1, y1, x2, y2) {
+  stats.walls[side - 1]++;
   const dx = x2 - x1, dy = y2 - y1;
   const len = Math.hypot(dx, dy) || 1;
   const half = Math.min(len, WALL_LEN) / 2;
@@ -1154,6 +1218,7 @@ function startDraft() {
   // Engagement : 1re rencontre → aléatoire ; revanche → l'autre camp commence. L'hôte décide, l'invité suit via l'état.
   if (mode !== "guest") { firstTurn = lastStarter ? 3 - lastStarter : (Math.random() < 0.5 ? 1 : 2); }
   turn = firstTurn; actPlayer = turn;
+  bodies = makeBodies(drafts[1], drafts[2]); ballTrail = []; // terrain remis à zéro dès le draft (sinon il affiche la partie précédente)
   updateBar(); broadcastState();
 }
 function draftActorSide() {
@@ -1367,7 +1432,7 @@ function ownTokenAt(p) { for (let i = 0; i < bodies.length; i++) { const b = bod
 function pointerDown(e) {
   const p = canvasPos(e);
   let idx = -1;
-  if (wallAim && phase === "aim") {
+  if (wallAim && (phase === "aim" || phase === "moving")) {
     drag = { kind: "wallaim", x1: p.x, y1: p.y, x2: p.x, y2: p.y };
   } else if (phase === "setup") {
     idx = tokenAt(p, (b) => mode === "local" || (mode !== null && b.owner === mySide));
@@ -1521,6 +1586,13 @@ function draw() {
   }
   ctx.strokeStyle = T.line; ctx.lineWidth = 3;
   ctx.strokeRect(8, 8, W - 16, H - 16);
+  if (mode && (turn === 1 || turn === 2)) { // liseré du camp qui joue
+    ctx.save();
+    ctx.strokeStyle = turn === 1 ? "rgba(255,107,107,0.55)" : "rgba(91,155,212,0.60)";
+    ctx.lineWidth = 6;
+    ctx.strokeRect(4, 4, W - 8, H - 8);
+    ctx.restore();
+  }
   if (hasWalls()) { // bordures visibles sur la glace
     ctx.save();
     ctx.strokeStyle = "rgba(225,242,255,0.95)"; ctx.lineWidth = 9;
@@ -1563,6 +1635,11 @@ function draw() {
     ctx.font = "600 12px system-ui"; ctx.fillStyle = "#e8e2ff"; ctx.textAlign = "center";
     ctx.fillText(Math.round(L) + " / " + WALL_LEN + " px", (drag.x1 + ex) / 2, (drag.y1 + ey) / 2 - 12);
     ctx.restore();
+  }
+  for (let k = 0; k < ballTrail.length; k++) { // traînée du ballon
+    const p = ballTrail[k];
+    ctx.beginPath(); ctx.arc(p.x, p.y, BALL_R * (0.25 + 0.55 * (k + 1) / ballTrail.length), 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255," + ((k + 1) / ballTrail.length * 0.25).toFixed(3) + ")"; ctx.fill();
   }
   for (let i = 0; i < bodies.length; i++) {
     const b = bodies[i];
@@ -1639,7 +1716,7 @@ function draw() {
   // bouton mur : visible pour l'acteur local en phase aim si Merlin est armé
   const wb = $("btnWall");
   const wside = mode === "local" ? turn : mySide;
-  if (phase === "aim" && mode !== "spectator" && isActingPlayer() && wallArmed(wside)) wb.style.display = "block";
+  if ((phase === "aim" || phase === "moving") && mode !== "spectator" && isActingPlayer() && wallArmed(wside)) wb.style.display = "block";
   else { wb.style.display = "none"; }
   // messages contextuels (prompts : n'écrasent pas un flash récent)
   if (mode === "spectator" && netUp && Date.now() - lastStateAt > 10000) setStatus("⚠️ Flux interrompu — en attente de l'hôte…");
@@ -1704,12 +1781,13 @@ function drawGoal(goal, col) {
   ctx.restore();
 }
 function drawToken(b, i) {
+  const rr = b.r * (1 + 0.22 * (b.wob || 0)); // squash d'impact
   ctx.save();
-  ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 3, 0, Math.PI * 2);
+  ctx.beginPath(); ctx.arc(b.x, b.y, rr + 3, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(0,0,0,0.30)"; ctx.fill();
-  ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.clip();
+  ctx.beginPath(); ctx.arc(b.x, b.y, rr, 0, Math.PI * 2); ctx.clip();
   const av = AVATARS[b.char];
-  if (av && av.complete && av.naturalWidth) ctx.drawImage(av, b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
+  if (av && av.complete && av.naturalWidth) ctx.drawImage(av, b.x - rr, b.y - rr, rr * 2, rr * 2);
   else if (AVATAR_DATA[b.char]) { ctx.fillStyle = b.owner === 1 ? "#c0392b" : "#2166a8"; ctx.fill(); }
   else { // v8 : nouveau perso sans image → pastille couleur + initiales
     ctx.fillStyle = CHAR_COLORS[b.char] || (b.owner === 1 ? "#c0392b" : "#2166a8");
@@ -1752,14 +1830,15 @@ function drawToken(b, i) {
   }
 }
 function drawBall(b) {
+  const rr = b.r * (1 + 0.25 * (b.wob || 0)); // squash d'impact
   ctx.save();
-  ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 2, 0, Math.PI * 2);
+  ctx.beginPath(); ctx.arc(b.x, b.y, rr + 2, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill();
-  ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+  ctx.beginPath(); ctx.arc(b.x, b.y, rr, 0, Math.PI * 2);
   const T = TERRAINS[terrain];
   ctx.fillStyle = T.ball; ctx.fill();
   ctx.strokeStyle = T.dot; ctx.lineWidth = 1.5; ctx.stroke();
-  ctx.beginPath(); ctx.arc(b.x, b.y, b.r * .45, 0, Math.PI * 2);
+  ctx.beginPath(); ctx.arc(b.x, b.y, rr * .45, 0, Math.PI * 2);
   ctx.fillStyle = T.dot; ctx.fill();
   ctx.restore();
 }
@@ -1905,7 +1984,7 @@ function loop() {
     if (phase === "goal" && mode !== "spectator") {
       goalTimer--;
       if (goalTimer <= 0 && mode !== "guest") {
-        resetPositions(); phase = "aim";
+        resetPositions(); phase = "aim"; hide("goalOverlay");
         turn = goalScorer === 1 ? 2 : 1;
         actPlayer = turn;
         freshTurnInfo(); updateBar(); broadcastState();
@@ -2314,7 +2393,7 @@ function broadcastState() {
   if (mode === "host") {
     const vnames = Object.keys(viewers);
     sendMsg({
-      t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady, terrain, trigOpts, firstTurn,
+      t: "state", bodies, scores, turn, actPlayer, phase, goalScorer, turnInfo, setupReady, terrain, trigOpts, firstTurn, st: stats,
       dlIn: actionDeadline ? Math.max(0, actionDeadline - Date.now()) : 0,
       setupIn: (phase === "setup" && setupDeadline) ? Math.max(0, setupDeadline - Date.now()) : 0,
       draftIn: (phase === "draft" && !snake && draftDeadline) ? Math.max(0, draftDeadline - Date.now()) : 0,
@@ -2354,7 +2433,7 @@ function onMsg(m) {
   } else if (m.t === "draft_pick" && mode === "host") {
     if (phase === "draft" && snake && snakeTurn === 2 && typeof m.char === "string") draftPick(2, m.char);
   } else if (m.t === "wall" && mode === "host") {
-    if (phase === "aim" && turn === 2 && wallArmed(2)) placeWall(2, m.x1, m.y1, m.x2, m.y2);
+    if ((phase === "aim" || phase === "moving") && turn === 2 && wallArmed(2)) placeWall(2, m.x1, m.y1, m.x2, m.y2);
   } else if (m.t === "setup_done" && mode === "host") {
     if (phase === "setup" && Array.isArray(m.pos) && m.pos.length === 4) {
       for (let i = 0; i < 4; i++) {
@@ -2373,6 +2452,7 @@ function onMsg(m) {
     bodies = m.bodies; scores = m.scores; turn = m.turn; actPlayer = m.actPlayer || m.turn;
     goalScorer = m.goalScorer;
     if (m.firstTurn !== undefined) firstTurn = m.firstTurn; // engagement décidé par l'hôte
+    if (m.st) stats = m.st; // stats de fin de partie synchronisées
     // nettoyage local : un drag résiduel de l'invité ne doit jamais bloquer la fenêtre de pichenette suivante
     if (mode === "guest" && (m.phase !== "aim" || (m.actPlayer || m.turn) !== mySide)) { drag = null; wallAim = false; }
     if (m.turnInfo) turnInfo = m.turnInfo;
@@ -2400,6 +2480,7 @@ function onMsg(m) {
     setupDeadline = (m.phase === "setup" && m.setupIn) ? Date.now() + m.setupIn : 0;
     const prevPhase = phase;
     phase = m.phase;
+    if (prevPhase === "goal" && m.phase !== "goal") hide("goalOverlay"); // célébration vue côté invité
     if (mine && m.phase === "setup") for (let i = 0; i < 4; i++) if (bodies[4 + i]) { bodies[4 + i].x = mine[i].x; bodies[4 + i].y = mine[i].y; bodies[4 + i].out = mine[i].out; }
     if (phase === "setup") {
       const btn = $("setupBtn");
@@ -2437,7 +2518,11 @@ function onMsg(m) {
     const p = getProfile();
     p.elo = m.yourElo;
     if (m.delta >= 0) p.w++; else p.l++;
+    p.g = (p.g || 0) + (scores[1] || 0); // buts marqués (l'invité est 🔵)
+    p.ch = p.ch || {};
+    for (const c of (drafts[2] || [])) p.ch[c] = (p.ch[c] || 0) + 1;
     saveProfile(p);
+    pubLadder({ name: p.name, elo: p.elo, w: p.w, l: p.l, g: p.g, pf: topChar(p.ch) }); // l'invité republie sa ligne complète
     $("winText").textContent += " — Elo : " + m.yourElo + " (" + (m.delta >= 0 ? "+" : "") + m.delta + ")";
   } else if (m.t === "rematch" && mode === "host") {
     rematch();
@@ -2449,22 +2534,26 @@ const ELO_START = 1000, ELO_K = 32;
 let ranked = false, oppProfile = null;
 let queueMq = null, queueTmr = null, myQid = null, ladderMq = null, queueMatched = false;
 function loadProfile() { try { const p = JSON.parse(localStorage.getItem("pichn_profile")); if (p && p.name) return p; } catch (e) {} return null; }
-function getProfile() { return loadProfile() || { name: "", elo: ELO_START, w: 0, l: 0 }; }
+function getProfile() { return loadProfile() || { name: "", elo: ELO_START, w: 0, l: 0, g: 0, ch: {} }; }
+function topChar(ch) { let best = null, n = 0; for (const k in (ch || {})) if (ch[k] > n) { n = ch[k]; best = k; } return best; } // perso le plus joué
 function saveProfile(p) { try { localStorage.setItem("pichn_profile", JSON.stringify(p)); } catch (e) {} }
 function expectedElo(a, b) { return 1 / (1 + Math.pow(10, (b - a) / 400)); }
 function helloMsg() { const p = getProfile(); return { t: "hello", name: p.name || "Anonyme", elo: p.elo }; }
 function welcomeMsg() { const p = getProfile(); return { t: "welcome", name: p.name || "Anonyme", elo: p.elo, terr: terrain }; }
-function pubLadder(e) { try { if (mq && mq.connected) mq.publish("pichn/ladder/" + e.name, JSON.stringify({ n: e.name, e: e.elo, w: e.w || 0, l: e.l || 0, ts: Date.now() }), { qos: 0, retain: true }); } catch (err) {} }
+function pubLadder(e) { try { if (mq && mq.connected) mq.publish("pichn/ladder/" + e.name, JSON.stringify({ n: e.name, e: e.elo, w: e.w || 0, l: e.l || 0, g: e.g || 0, pf: e.pf || null, ts: Date.now() }), { qos: 0, retain: true }); } catch (err) {} }
 function settleElo(hostWon) {
   const me = getProfile(); const opp = oppProfile || { name: "Anonyme", elo: ELO_START };
   const myDelta = Math.round(ELO_K * ((hostWon ? 1 : 0) - expectedElo(me.elo, opp.elo)));
   const oppDelta = -myDelta;
   const myNew = me.elo + myDelta, oppNew = opp.elo + oppDelta;
   me.elo = myNew; if (hostWon) me.w++; else me.l++;
+  me.g = (me.g || 0) + (scores[0] || 0); // buts marqués (l'hôte est 🔴)
+  me.ch = me.ch || {};
+  for (const c of (drafts[1] || [])) me.ch[c] = (me.ch[c] || 0) + 1; // picks de perso
   saveProfile(me);
   $("winText").textContent = (hostWon ? "🏆 Rouge gagne !" : "🏆 Bleu gagne !") + " — Elo : " + myNew + " (" + (myDelta >= 0 ? "+" : "") + myDelta + ")";
-  pubLadder({ name: me.name, elo: myNew, w: me.w, l: me.l });
-  pubLadder({ name: opp.name, elo: oppNew, w: (opp.w || 0) + (hostWon ? 0 : 1), l: (opp.l || 0) + (hostWon ? 1 : 0) });
+  pubLadder({ name: me.name, elo: myNew, w: me.w, l: me.l, g: me.g, pf: topChar(me.ch) });
+  pubLadder({ name: opp.name, elo: oppNew, w: (opp.w || 0) + (hostWon ? 0 : 1), l: (opp.l || 0) + (hostWon ? 1 : 0), g: (opp.g || 0) + (scores[1] || 0) });
   sendMsg({ t: "elo", yourElo: oppNew, delta: oppDelta });
 }
 function startQueue() {
@@ -2518,8 +2607,8 @@ function stopQueue(endClient) {
 function openLadder() {
   show("ladderPanel");
   const mp = getProfile();
-  $("myEloLine").textContent = "Ton Elo : " + mp.elo + " (" + (mp.w || 0) + "V - " + (mp.l || 0) + "D)";
-  if (!netAvailable()) { $("ladderBody").innerHTML = "<tr><td colspan='4'>Bibliothèque réseau non chargée.</td></tr>"; return; }
+  $("myEloLine").textContent = "Ton Elo : " + mp.elo + " (" + (mp.w || 0) + "V - " + (mp.l || 0) + "D)" + (topChar(mp.ch) ? " · Perso fétiche : " + CHAR_NAMES[topChar(mp.ch)] : "") + " · Buts : " + (mp.g || 0);
+  if (!netAvailable()) { $("ladderBody").innerHTML = "<tr><td colspan='6'>Bibliothèque réseau non chargée.</td></tr>"; return; }
   if (ladderMq) { try { ladderMq.end(true); } catch (e) {} }
   const seen = {};
   ladderMq = mqtt.connect(MQTT_URL, { clientId: "pichn-l-" + Math.random().toString(36).slice(2, 8), clean: true, reconnectPeriod: 3000, connectTimeout: 8000 });
@@ -2532,8 +2621,8 @@ function openLadder() {
 function renderLadder(seen) {
   const rows = Object.values(seen).sort((a, b) => b.e - a.e);
   const me = getProfile();
-  let html = rows.map((r, i) => "<tr" + (r.n === me.name ? " class='me'" : "") + "><td>" + (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1) + "</td><td>" + String(r.n).replace(/[<>&]/g, "") + "</td><td>" + r.e + "</td><td>" + (r.w || 0) + "V - " + (r.l || 0) + "D</td></tr>").join("");
-  if (!rows.length) html = "<tr><td colspan='4'>Aucun joueur classé pour l'instant — lance une partie classée !</td></tr>";
+  let html = rows.map((r, i) => "<tr" + (r.n === me.name ? " class='me'" : "") + "><td>" + (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1) + "</td><td>" + String(r.n).replace(/[<>&]/g, "") + "</td><td>" + r.e + "</td><td>" + (r.w || 0) + "V - " + (r.l || 0) + "D</td><td>" + (r.pf ? (CHAR_NAMES[r.pf] || r.pf) : "—") + "</td><td>" + (r.g || 0) + "</td></tr>").join("");
+  if (!rows.length) html = "<tr><td colspan='6'>Aucun joueur classé pour l'instant — lance une partie classée !</td></tr>";
   $("ladderBody").innerHTML = html;
 }
 // ---------- Fiche personnage ----------
@@ -2543,7 +2632,7 @@ const CHAR_INFO = {
   benp: "Si le ballon le touche (même pendant le tour adverse), à la fin de la course du ballon son camp obtient un tir gratuit depuis la position du ballon.",
   synfo: "Si le ballon la touche, à la fin de la course : laisser le ballon OU passe : choisis l'allié puis oriente librement le ballon autour de lui. Combo : une passe à BenP déclenche son tir gratuit !",
   leure: "Chaque allié qu'il touche pendant sa course gagne immédiatement +1 pichenette (utilisable dans le même tour). Les bonus non utilisés sont perdus à la fin du tour.",
-  merlin: "Immobile : ni un jeton adverse ni le ballon ne peuvent le déplacer (ils rebondissent). Barre ESPACE (ou bouton 🧱) : place son mur (l'ancien disparaît), qui fait rebondir tout. Un seul mur par tour, uniquement s'il a bougé pendant CE tour (pichenetté ou poussé par un allié) — armement non utilisé = perdu en fin de tour. Le mur reste en place jusqu'à son remplacement. Sensible à Wun.",
+  merlin: "Immobile : ni un jeton adverse ni le ballon ne peuvent le déplacer (ils rebondissent). Barre ESPACE (ou bouton 🧱) : place son mur (l'ancien disparaît), qui fait rebondir tout — le meilleur moment : ESPACE pendant sa course après l'avoir pichenetté ! Un seul mur par tour, uniquement s'il a bougé pendant CE tour (pichenetté ou poussé par un allié) — armement non utilisé = perdu en fin de tour. Le mur reste en place jusqu'à son remplacement. Sensible à Wun.",
   cyrilou: "Si le ballon le touche : laisser le ballon OU tirer — le ballon vient à lui, tu l'oriente autour de lui puis tires avec une puissance ×2. Ce tir ne peut PAS marquer (les buts rebondissent) et ne déclenche aucune autre capacité. Combo : une passe à Cyrilou déclenche son tir !",
   mizterio: "À la fin de la course, s'il a touché un (ou plusieurs) ennemi(s) — même en défense — il peut échanger la position de l'ennemi de son choix avec celle de n'importe quel autre jeton du plateau (mort autorisé, sorti exclu)."
 };
@@ -2568,11 +2657,13 @@ function startGame(m, side) {
   if (mode === "ai") setStatus("🤖 Tu es 🔴 Rouge — l'IA est 🔵 Bleu.");
   if (mode === "host" || mode === "guest") { $("chatBtn").classList.remove("hidden"); }
   updateNamesPill();
+  show("btnRulesGame");
   startDraft();
   if (mode === "host") broadcastState();
 }
 function startSetup() {
   scores = [0, 0]; turn = firstTurn; actPlayer = turn; phase = "setup"; drag = null;
+  stats = { flicks: [0, 0], walls: [0, 0], outs: [0, 0] }; ballTrail = [];
   setupDeadline = Date.now() + 60000;
   armTimer(0);
   benpToken = -1; synfoToken = -1; passTarget = -1;
@@ -2603,6 +2694,8 @@ function saveSideSetup(side) {
 function endGame(winner) {
   phase = "over";
   lastStarter = firstTurn; // la revanche : l'autre camp commencera
+  hide("goalOverlay");
+  $("winStats").innerHTML = "📊 <b>Stats</b><br>🔴 Rouge : <b>" + (stats.flicks[0] || 0) + "</b> pichenettes · <b>" + (stats.walls[0] || 0) + "</b> mur(s) · <b>" + (stats.outs[0] || 0) + "</b> sorties provoquées<br>🔵 Bleu : <b>" + (stats.flicks[1] || 0) + "</b> pichenettes · <b>" + (stats.walls[1] || 0) + "</b> mur(s) · <b>" + (stats.outs[1] || 0) + "</b> sorties provoquées";
   $("winText").textContent = winner === 1 ? "🏆 Rouge gagne !" : "🏆 Bleu gagne !";
   show("winOverlay"); updateBar(); sndWin();
   if (mode === "host") broadcastState();
@@ -2614,6 +2707,7 @@ function rematch() {
 }
 function backMenu() {
   cleanupNet(); clearTimeout(aiTimer); mode = null; ranked = false; oppProfile = null;
+  hide("goalOverlay"); hide("rulesPanel"); hide("btnRulesGame");
   $("setupBtn").style.display = "none";
   $("reviveBtn").style.display = "none"; $("btnWall").style.display = "none";
   hide("winOverlay"); hide("synfoPanel"); hide("trigPanel"); hide("revivePanel"); hide("draftPanel"); hide("cyrilouPanel"); hide("mizPanel"); show("menu");
@@ -2686,7 +2780,7 @@ $("btnDraftOk").onclick = () => validateDraft();
 $("btnWall").onclick = () => { toggleWallAim(); };
 function toggleWallAim() {
   const side = mode === "local" ? turn : mySide;
-  if (phase !== "aim" || mode === "spectator") return;
+  if ((phase !== "aim" && phase !== "moving") || mode === "spectator") return;
   if (!wallArmed(side)) { setStatus("🧱 Merlinpinpin doit avoir bougé pendant CE tour (pichenetté ou poussé par un allié) — un seul mur par tour, armement non utilisé = perdu en fin de tour."); sndUi(); return; }
   wallAim = !wallAim;
   setStatus(wallAim ? "🧱 Trace ton mur : clic-glissé d'un point à un autre (clic droit pour annuler)." : "🧱 Placement du mur annulé.");
@@ -2696,7 +2790,7 @@ document.addEventListener("keydown", (e) => {
   if (e.code !== "Space") return;
   if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "BUTTON")) return;
   e.preventDefault();
-  if (phase === "aim") toggleWallAim();
+  if (phase === "aim" || phase === "moving") toggleWallAim();
 });
 $("reviveBtn").onclick = () => {
   if (phase !== "aim" || !isActingPlayer()) return;
@@ -2722,6 +2816,9 @@ $("btnBackMenu").onclick = backMenu;
 // ---------- Boutons v2 : queue, classement, terrains, fiche ----------
 $("btnRanked").onclick = () => { if (!netAvailable()) { alert("La bibliothèque réseau n'a pas pu être chargée — vérifie ta connexion internet puis recharge la page."); return; } startQueue(); };
 $("btnLadder").onclick = openLadder;
+$("btnRules").onclick = () => show("rulesPanel");
+$("btnCloseRules").onclick = () => hide("rulesPanel");
+$("btnRulesGame").onclick = () => show("rulesPanel");
 $("btnCloseLadder").onclick = () => { hide("ladderPanel"); try { if (ladderMq) ladderMq.end(true); } catch (e) {} ladderMq = null; };
 $("btnCancelQueue").onclick = () => { stopQueue(true); ranked = false; oppProfile = null; hide("queuePanel"); show("menu"); };
 // ---------- Boutons v7 : spectateur, chat, mute ----------
@@ -2763,6 +2860,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="1fkoiPA8vgTo+1ghzs9Qjg==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="GxG0F/BRxWIO18NK9VxLdw==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
