@@ -15,45 +15,45 @@ small{opacity:.6}
 <div class="box"><div class="big">⚽</div><div>Chargement de Pichenette…</div><small>redirection vers la dernière version</small></div>
 <script>
 (function () {
-  var FALLBACK = "v8.6.html";           // version de secours si les API ne répondent pas
-  var re = /^v\d+(\.\d+)*\.html$/;      // fichiers de version : v8.5.html, v8.6.html…
+  var FALLBACK = "v8.9.html";            // version de secours si tout échoue
+  var reM = /^v(\d+)\.(\d+)\.html$/;      // fichiers de version : v8.5.html, v8.9.html…
   var last = null;
   try { last = localStorage.getItem("pichn_last_version"); } catch (e) {}
-  function cmp(a, b) {
-    var pa = a.replace(/^v/, "").replace(/\.html$/, "").split(".");
-    var pb = b.replace(/^v/, "").replace(/\.html$/, "").split(".");
-    for (var i = 0; i < Math.max(pa.length, pb.length); i++) {
-      var x = parseInt(pa[i] || "0", 10), y = parseInt(pb[i] || "0", 10);
-      if (x !== y) return x - y;
-    }
-    return 0;
-  }
   function go(name) {
     try { localStorage.setItem("pichn_last_version", name); } catch (e) {}
     location.replace(name);
   }
-  function pick(names) {
-    var files = names.filter(function (n) { return re.test(n); }).sort(cmp);
-    if (files.length) go(files[files.length - 1]);
-    else go(last || FALLBACK);
-  }
-  // 1) API GitHub (toujours à jour) — 2) jsDelivr (secours) — 3) dernier connu / FALLBACK
+  function cmp(a, b) { return a === b ? 0 : (a < b ? -1 : 1); }
+  // 1) API GitHub (exacte, mais souvent limitée en débit → 403)
   fetch("https://api.github.com/repos/Drasahaoe/pichenette/contents/")
-    .then(function (r) { return r.json(); })
+    .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
     .then(function (d) {
-      if (Array.isArray(d)) { pick(d.map(function (f) { return f.name; })); return; }
-      throw new Error("api");
+      if (!Array.isArray(d)) throw new Error("shape");
+      var vs = d.map(function (f) { return f.name; }).filter(function (n) { return reM.test(n); }).sort(cmp);
+      if (!vs.length) throw new Error("empty");
+      go(vs[vs.length - 1]);
     })
-    .catch(function () {
-      fetch("https://data.jsdelivr.com/v1/packages/gh/Drasahaoe/pichenette@main")
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          pick((d && d.files ? d.files : []).map(function (f) { return f.name; }));
-        })
-        .catch(function () { go(last || FALLBACK); });
-    });
+    .catch(function () { probe(); });
+  // 2) Sondage DIRECT sur ce site (même origine : toujours frais, insensible aux caches CDN
+  //    comme jsDelivr qui a déjà servi des listes obsolètes → vieilles versions du jeu)
+  function probe() {
+    var base = (last && reM.exec(last)) || [null, "8", "9"];
+    var M = parseInt(base[1], 10);
+    var cands = [];
+    var m, n, m2;
+    for (m = 0; m <= 30; m++) cands.push("v" + M + "." + m + ".html");
+    for (n = 1; n <= 2; n++) for (m2 = 0; m2 <= 9; m2++) cands.push("v" + (M + n) + "." + m2 + ".html");
+    var best = null, i = 0;
+    (function next() {
+      if (i >= cands.length) { go(best || last || FALLBACK); return; }
+      var f = cands[i++];
+      fetch(f, { method: "HEAD" })
+        .then(function (r) { if (r.ok) best = f; next(); }, next)
+        .catch(next);
+    })();
+  }
 })();
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="L7yq0Z+ObOuM9voDQRb6dg==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="o97YWpN77KdM9Fzdyd/KzA==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
