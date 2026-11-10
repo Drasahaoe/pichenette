@@ -26,9 +26,11 @@
   #turnPopup.blue { color: #d9ecff; background: linear-gradient(0deg, rgba(29,74,122,.55), rgba(12,18,30,.6)); }
   #turnPopup.opp { background: rgba(12,18,30,.5); opacity: .92; }
   @keyframes popIn { from { transform: scale(.62); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  #sidePanel, #sidePanelR { width: 186px; flex: none; background: rgba(22,32,50,.55); border: 1px solid #3b5170; border-radius: 12px; padding: 9px 8px; overflow-y: auto; font-size: 11px; line-height: 1.3; }
+  #sidePanel, #sidePanelR { width: 186px; flex: none; background: rgba(22,32,50,.55); border: 1px solid #3b5170; border-radius: 12px; padding: 8px 5px; overflow-y: auto; font-size: 11px; line-height: 1.3; }
   #sidePanel h4, #sidePanelR h4 { margin: 2px 0 8px; font-size: 12px; letter-spacing: .4px; padding-bottom: 5px; border-bottom: 2px solid #3b5170; }
-  .spItem { display: flex; gap: 8px; margin-bottom: 6px; align-items: center; background: rgba(38,53,74,.45); border: 1px solid rgba(59,81,112,.55); border-radius: 9px; padding: 6px; }
+  .spItem { display: flex; gap: 6px; margin-bottom: 5px; align-items: center; background: rgba(38,53,74,.45); border: 1px solid rgba(59,81,112,.55); border-radius: 9px; padding: 5px 4px; }
+  #sidePanelR .spItem { flex-direction: row-reverse; }  /* v8.10e : panneau adverse en MIROIR (avatar à droite) */
+  #sidePanelR .spTxt { text-align: right; }               /* descriptions alignées à droite */
   .spItem img, .spItem .spPh { width: 30px; height: 30px; border-radius: 50%; flex: none; object-fit: cover; border: 2px solid rgba(255,209,102,.35); }
   .spItem .spPh { display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; }
   .spItem .spTxt { min-width: 0; flex: 1; }
@@ -163,7 +165,7 @@
   <div id="statusline"><span id="status"></span></div>
   <div id="gamezone">
     <div id="sidePanel" class="hidden"></div>
-    <div id="gameholder"><canvas id="cv" width="1000" height="600"></canvas><div id="turnPopup" class="hidden"></div></div>
+    <div id="gameholder"><canvas id="cv" width="1000" height="600"></canvas><div id="turnPopup" class="hidden"></div><button id="passBtn" class="btn" style="position:absolute;bottom:2px;right:2px;width:auto;padding:9px 18px;margin:0;z-index:5;display:none;background:linear-gradient(160deg,#6b2430,#4a1a24);border-color:#ff6b6b;font-weight:800;letter-spacing:.5px;">⏭️ PASSER LE TOUR</button></div>
     <div id="sidePanelR" class="hidden"></div>
   </div>
 </div>
@@ -176,7 +178,7 @@
 <button id="setupBtn" class="btn" style="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);width:auto;padding:10px 24px;margin:0;z-index:5;display:none;background:#2f7a44;border-color:#4fae6b;">✅ Positions validées</button>
 <button id="reviveBtn" class="btn" style="position:fixed;bottom:16px;left:16px;width:auto;padding:10px 18px;margin:0;z-index:5;display:none;background:#7a5a20;border-color:#ffd166;">🩹 Ressusciter un jeton</button>
 <button id="btnWall" class="btn" style="position:fixed;bottom:16px;left:200px;width:auto;padding:10px 18px;margin:0;z-index:5;display:none;background:#3d2a5c;border-color:#8f6fd0;">🧱 Mur (Espace)</button>
-<button id="passBtn" class="btn" style="position:fixed;bottom:16px;right:16px;width:auto;padding:10px 20px;margin:0;z-index:5;display:none;background:linear-gradient(160deg,#6b2430,#4a1a24);border-color:#ff6b6b;font-weight:800;letter-spacing:.5px;">⏭️ PASSER LE TOUR</button>
+
 
 <!-- MENU -->
 <div class="overlay" id="menu">
@@ -912,6 +914,9 @@ function startTrigger(i, isCounter) {
   const tok = bodies[i];
   actPlayer = tok.owner;
   turnInfo.counter = !!isCounter;
+  if (isCounter) { // le contre-jeu CLOUT le tour en cours : les rejoues en attente du camp qui joue sont perdus
+    turnInfo.drasahExtra = false; bonusFlicks = {}; chironTouched = []; deferred = []; // (v8.10b : le tour passe à l'autre camp après la résolution)
+  }
   inResolution = true;
   const team = tok.owner === 1 ? "Rouge" : "Bleu";
   burst(tok.x, tok.y, tok.owner === 1 ? ["#ff6b6b", "#ffd166"] : ["#5b9bd4", "#ffd166"], 26, 4);
@@ -3091,6 +3096,6 @@ updateBar();
 loop();
 
 </script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="k1+HjGlPnRDuWUU+7d2ZYA==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" nonce="k0XuigVWaEFc/QrM9GdcaQ==" data-cf-beacon='{"version":"2024.11.0","token":"36b4216ae2dc4d5488c249161e71fe1e","spa":2}' crossorigin="anonymous"></script>
 </body>
 </html>
